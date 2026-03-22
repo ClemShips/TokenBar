@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=340">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: -apple-system, 'Inter', sans-serif;
+  background: #F7F6F3;
+  color: #2D2D2D;
+  width: 340px;
+  overflow-x: hidden;
+  user-select: none;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #fff;
+  border-bottom: 1px solid #F0EFEC;
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+.icon {
+  width: 28px; height: 28px;
+  background: #7C9070;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+}
+.app-title { font-size: 14px; font-weight: 600; color: #2D2D2D; }
+.updated { font-size: 11px; color: #8E8E93; }
+
+.content {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8E8E93;
+  letter-spacing: 0.8px;
+  margin-top: 2px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.usage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #2D2D2D;
+}
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+.badge-green  { background: rgba(124,144,112,.13); color: #4A5D43; }
+.badge-orange { background: rgba(212,132,94,.13);  color: #D4845E; }
+.badge-red    { background: rgba(200,60,60,.13);   color: #c53030; }
+
+.progress-track {
+  height: 6px;
+  background: #F0EFEC;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+  width: 0%;
+}
+.fill-green  { background: #7C9070; }
+.fill-orange { background: #D4845E; }
+.fill-red    { background: #c53030; }
+
+.reset-time {
+  font-size: 11px;
+  color: #8E8E93;
+  text-align: right;
+  min-height: 14px;
+}
+
+.divider { height: 1px; background: #F0EFEC; margin: 2px 0; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.stat-value       { font-size: 20px; font-weight: 600; color: #2D2D2D; line-height: 1.1; }
+.stat-value.green { color: #7C9070; }
+.stat-value.sm    { font-size: 16px; }
+.stat-label       { font-size: 10px; color: #8E8E93; }
+
+.cache-row {
+  font-size: 11px;
+  color: #8E8E93;
+  text-align: center;
+}
+.models-row {
+  background: #F7F6F3;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #6B6B6B;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+.models-row .models-text { flex: 1; }
+
+.compact-card {
+  flex-direction: row !important;
+  padding: 12px 16px;
+}
+.compact-card .stat { flex: 1; }
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+.btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+.btn-quit    { font-size: 12px; color: #8E8E93; }
+.btn-quit:hover { color: #2D2D2D; }
+.btn-refresh { font-size: 12px; color: #7C9070; font-weight: 500; }
+.btn-refresh:hover { opacity: 0.7; }
+.spinner { display: none; }
+.spinner.spin { display: inline; animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.no-live {
+  font-size: 11px;
+  color: #8E8E93;
+  font-style: italic;
+  text-align: center;
+  padding: 4px 0;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="icon">📊</div>
+    <span class="app-title">TokenBar</span>
+  </div>
+  <span class="updated" id="updated">—</span>
+</div>
+
+<div class="content">
+
+  <div class="section-label">LIMITES D'UTILISATION</div>
+  <div class="card" id="live-card">
+    <div id="live-content">
+      <div class="usage-row">
+        <span>5 dernières heures</span>
+        <span class="badge badge-green" id="pct-5h">—</span>
+      </div>
+      <div class="progress-track" style="margin-top:2px">
+        <div class="progress-fill fill-green" id="bar-5h"></div>
+      </div>
+      <div class="reset-time" id="reset-5h"></div>
+      <div class="divider"></div>
+      <div class="usage-row">
+        <span>7 derniers jours</span>
+        <span class="badge badge-orange" id="pct-7d">—</span>
+      </div>
+      <div class="progress-track" style="margin-top:2px">
+        <div class="progress-fill fill-orange" id="bar-7d"></div>
+      </div>
+      <div class="reset-time" id="reset-7d"></div>
+    </div>
+  </div>
+
+  <div class="section-label">AUJOURD'HUI</div>
+  <div class="card">
+    <div class="stats-grid">
+      <div class="stat">
+        <div class="stat-value" id="today-msgs">—</div>
+        <div class="stat-label">messages</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="today-input">—</div>
+        <div class="stat-label">input</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="today-output">—</div>
+        <div class="stat-label">output</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value green" id="today-cost">—</div>
+        <div class="stat-label">coût est.</div>
+      </div>
+    </div>
+    <div class="cache-row" id="today-cache"></div>
+    <div class="models-row">
+      <span>🤖</span>
+      <span class="models-text" id="today-models">—</span>
+    </div>
+  </div>
+
+  <div class="section-label">CE MOIS</div>
+  <div class="card compact-card">
+    <div class="stat">
+      <div class="stat-value sm" id="month-msgs">—</div>
+      <div class="stat-label">messages</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value sm" id="month-output">—</div>
+      <div class="stat-label">output</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value sm green" id="month-cost">—</div>
+      <div class="stat-label">coût est.</div>
+    </div>
+  </div>
+
+  <div class="section-label">DEPUIS JAN. 2026</div>
+  <div class="card compact-card">
+    <div class="stat">
+      <div class="stat-value sm" id="hist-msgs">—</div>
+      <div class="stat-label">messages</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value sm" id="hist-output">—</div>
+      <div class="stat-label">output</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value sm green" id="hist-cost">—</div>
+      <div class="stat-label">coût est.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn btn-quit" onclick="doQuit()">Quitter</button>
+    <button class="btn btn-refresh" onclick="doRefresh()" id="refresh-btn">
+      <span id="refresh-icon">↺</span> Actualiser
+    </button>
+  </div>
+
+</div>
+
+<script>
+function fmtTokens(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return Math.round(n / 1e3) + 'K';
+  return String(n);
+}
+
+function fmtCost(usd) {
+  if (usd >= 1) return '$' + usd.toFixed(2);
+  return '$' + usd.toFixed(3);
+}
+
+function fmtNum(n) {
+  return n.toLocaleString('fr-FR');
+}
+
+function fmtReset(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const diff = new Date(isoStr) - new Date();
+    if (diff <= 0) return 'expiré';
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    if (h >= 24) {
+      const d = Math.floor(h / 24);
+      return `reset dans ${d}j ${h % 24}h${String(m).padStart(2, '0')}`;
+    }
+    return `reset dans ${h}h${String(m).padStart(2, '0')}`;
+  } catch (e) { return ''; }
+}
+
+function setPct(badgeId, barId, pct) {
+  const badge = document.getElementById(badgeId);
+  const bar   = document.getElementById(barId);
+  badge.textContent = Math.round(pct) + '%';
+  bar.style.width   = Math.min(pct, 100) + '%';
+
+  let cls = pct >= 80 ? 'red' : pct >= 50 ? 'orange' : 'green';
+  badge.className = 'badge badge-' + cls;
+  bar.className   = 'progress-fill fill-' + cls;
+}
+
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+window.updateData = function(data) {
+  const now = new Date();
+  set('updated', 'Mis à jour · ' +
+    String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0'));
+
+  if (data.live) {
+    const fh = data.live.five_hour  || {};
+    const sd = data.live.seven_day  || {};
+    setPct('pct-5h', 'bar-5h', fh.utilization || 0);
+    set('reset-5h', fmtReset(fh.resets_at));
+    setPct('pct-7d', 'bar-7d', sd.utilization || 0);
+    set('reset-7d', fmtReset(sd.resets_at));
+    document.getElementById('live-content').style.opacity = '1';
+  } else {
+    set('pct-5h', '—'); set('reset-5h', 'API indisponible');
+    set('pct-7d', '—'); set('reset-7d', 'API indisponible');
+    document.getElementById('live-content').style.opacity = '0.5';
+  }
+
+  const t = data.today || {};
+  set('today-msgs',   fmtNum(t.messages || 0));
+  set('today-input',  fmtTokens(t.input  || 0));
+  set('today-output', fmtTokens(t.output || 0));
+  set('today-cost',   fmtCost(t.cost     || 0));
+
+  const cache = (t.cache_read || 0) + (t.cache_create || 0);
+  set('today-cache', cache > 0 ? 'Cache · ' + fmtTokens(cache) : '');
+
+  const models = t.by_model || {};
+  const modelStr = Object.entries(models)
+    .sort((a, b) => b[1] - a[1])
+    .map(([m, v]) => m + ' · ' + fmtTokens(v))
+    .join('   ');
+  set('today-models', modelStr || '—');
+
+  const mo = data.month || {};
+  set('month-msgs',   fmtNum(mo.messages || 0));
+  set('month-output', fmtTokens(mo.output || 0));
+  set('month-cost',   fmtCost(mo.cost    || 0));
+
+  const h = data.history || {};
+  set('hist-msgs',   fmtNum(h.msgs    || 0));
+  set('hist-output', fmtTokens(h.out  || 0));
+  set('hist-cost',   fmtCost(h.cost   || 0));
+};
+
+function doQuit() {
+  window.webkit.messageHandlers.action.postMessage({ type: 'quit' });
+}
+function doRefresh() {
+  window.webkit.messageHandlers.action.postMessage({ type: 'refresh' });
+}
+</script>
+</body>
+</html>

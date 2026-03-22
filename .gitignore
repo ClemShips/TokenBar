@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Build artifacts
+build/
+dist/
+
+# BMAD framework
+_bmad/
+_bmad-output/
+
+# Claude Code
+.claude/
+
+# Design files
+*.pen
+
+# Generated icons (keep icon.svg source)
+icon.iconset/
+TokenBar.icns
+icon.svg.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
