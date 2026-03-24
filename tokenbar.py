@@ -53,9 +53,6 @@ const r = await fetch('https://claude.ai/api/oauth/usage', {
 process.stdout.write(await r.text());
 """
 
-MONTHS_FR = ["", "jan.", "fév.", "mars", "avr.", "mai", "juin",
-             "juil.", "août", "sep.", "oct.", "nov.", "déc."]
-
 
 def short_model(name):
     for k, v in SHORT_NAMES.items():
