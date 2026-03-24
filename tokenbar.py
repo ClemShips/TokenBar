@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import shutil
 import sys
 import glob
 import subprocess
@@ -37,7 +38,7 @@ SHORT_NAMES = {
     "claude-haiku-4-5-20251001":  "Haiku 4.5",
 }
 
-NODE_BIN     = "/usr/local/bin/node"
+NODE_BIN     = shutil.which("node")
 SECURITY_BIN = "/usr/bin/security"
 
 FETCH_SCRIPT = """
@@ -85,6 +86,9 @@ def get_oauth_token():
 
 
 def fetch_live_usage():
+    if not NODE_BIN:
+        log.warning("Node.js not found in PATH — live usage data unavailable")
+        return None
     token = get_oauth_token()
     if not token:
         return None
