@@ -22,6 +22,8 @@ from AppKit import (
 from WebKit import WKWebView, WKWebViewConfiguration
 
 CLAUDE_DIR = os.path.expanduser("~/.claude")
+CACHE_DIR  = os.path.expanduser("~/.config/tokenbar")
+CACHE_FILE = os.path.join(CACHE_DIR, "cache.json")
 
 PRICING = {
     "input":        3.00 / 1_000_000,
@@ -69,6 +71,25 @@ def fmt_tokens(n):
     return str(n)
 
 
+def load_cache():
+    try:
+        with open(CACHE_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_cache(cache):
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        tmp = CACHE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False)
+        os.replace(tmp, CACHE_FILE)
+    except OSError as e:
+        log.warning("save_cache failed: %s", e)
+
+
 def get_oauth_token():
     try:
         result = subprocess.run(
@@ -85,13 +106,13 @@ def get_oauth_token():
         return None
 
 
-def fetch_live_usage():
+def fetch_live_usage(cache):
     if not NODE_BIN:
         log.warning("Node.js not found in PATH — live usage data unavailable")
-        return None
+        return _live_fallback(cache)
     token = get_oauth_token()
     if not token:
-        return None
+        return _live_fallback(cache)
     try:
         env = {
             "HOME":         os.environ.get("HOME", ""),
@@ -106,10 +127,23 @@ def fetch_live_usage():
             capture_output=True, text=True, timeout=8,
             env=env
         )
-        return json.loads(result.stdout)
+        data = json.loads(result.stdout)
+        cache["last_live"] = data
+        cache["last_live_ts"] = datetime.now(timezone.utc).isoformat()
+        return data
     except Exception as e:
         log.warning("fetch_live_usage failed: %s", e)
-        return None
+        return _live_fallback(cache)
+
+
+def _live_fallback(cache):
+    cached = cache.get("last_live")
+    if cached:
+        ts = cache.get("last_live_ts", "")
+        log.debug("Using cached live data from %s", ts)
+        cached["_stale"] = True
+        cached["_stale_since"] = ts
+    return cached
 
 
 def empty_usage():
@@ -219,7 +253,10 @@ class ActionHandler(NSObject):
 
     def userContentController_didReceiveScriptMessage_(self, controller, message):
         body = message.body()
-        action_type = body.get("type") if isinstance(body, dict) else body
+        try:
+            action_type = body["type"] if hasattr(body, "__getitem__") else str(body)
+        except (KeyError, TypeError):
+            action_type = str(body)
         if action_type == "quit":
             NSApplication.sharedApplication().terminate_(None)
         elif action_type == "refresh":
@@ -302,7 +339,8 @@ class AppDelegate(NSObject):
         threading.Thread(target=self._do_refresh, daemon=True).start()
 
     def _do_refresh(self):
-        live    = fetch_live_usage()
+        cache   = load_cache()
+        live    = fetch_live_usage(cache)
         local   = parse_sessions()
         history = parse_history()
 
@@ -314,6 +352,7 @@ class AppDelegate(NSObject):
             "history": history,
         }
         self._cached_data = data
+        save_cache(cache)
 
         fh_pct = (live or {}).get("five_hour", {}).get("utilization")
         if fh_pct is not None:
