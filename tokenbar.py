@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 import json
+import logging
 import os
 import sys
 import glob
 import subprocess
 import threading
 from datetime import datetime, timedelta, timezone
+
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+log = logging.getLogger("tokenbar")
 
 import objc
 from Foundation import NSObject, NSURL, NSTimer
@@ -99,7 +103,8 @@ def fetch_live_usage():
             env=env
         )
         return json.loads(result.stdout)
-    except Exception:
+    except Exception as e:
+        log.warning("fetch_live_usage failed: %s", e)
         return None
 
 
@@ -133,6 +138,7 @@ def parse_sessions():
     cutoff_mtime = (now - timedelta(days=32)).timestamp()
 
     buckets = {"today": empty_usage(), "7d": empty_usage(), "month": empty_usage()}
+    skipped_lines = 0
 
     for path in glob.glob(os.path.join(CLAUDE_DIR, "projects", "**", "*.jsonl"), recursive=True):
         try:
@@ -158,16 +164,19 @@ def parse_sessions():
                         if ts >= month_start:
                             add_message_to(buckets["month"], usage, model)
                     except Exception:
-                        pass
-        except Exception:
-            pass
+                        skipped_lines += 1
+        except Exception as e:
+            log.warning("parse_sessions: cannot read %s: %s", path, e)
 
+    if skipped_lines:
+        log.debug("parse_sessions: skipped %d malformed lines", skipped_lines)
     return buckets
 
 
 def parse_history():
     cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
     msgs = out = cost = 0
+    skipped_lines = 0
 
     for path in glob.glob(os.path.join(CLAUDE_DIR, "projects", "**", "*.jsonl"), recursive=True):
         try:
@@ -192,10 +201,12 @@ def parse_history():
                         cost += (inp * PRICING["input"]       + o  * PRICING["output"] +
                                  cr  * PRICING["cache_read"]  + cc * PRICING["cache_create"])
                     except Exception:
-                        pass
-        except Exception:
-            pass
+                        skipped_lines += 1
+        except Exception as e:
+            log.warning("parse_history: cannot read %s: %s", path, e)
 
+    if skipped_lines:
+        log.debug("parse_history: skipped %d malformed lines", skipped_lines)
     return {"msgs": msgs, "out": out, "cost": cost}
 
 
