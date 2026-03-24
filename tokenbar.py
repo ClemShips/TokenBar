@@ -128,12 +128,37 @@ def fetch_live_usage(cache):
             env=env
         )
         data = json.loads(result.stdout)
+        if not _validate_live_response(data):
+            return _live_fallback(cache)
         cache["last_live"] = data
         cache["last_live_ts"] = datetime.now(timezone.utc).isoformat()
         return data
     except Exception as e:
         log.warning("fetch_live_usage failed: %s", e)
         return _live_fallback(cache)
+
+
+def _validate_live_response(data):
+    if not isinstance(data, dict):
+        log.warning("API response is not a dict — format may have changed")
+        return False
+    if "five_hour" not in data and "seven_day" not in data:
+        log.warning("API response missing expected keys (five_hour/seven_day) — format may have changed")
+        return False
+    return True
+
+
+def _validate_jsonl_entry(d):
+    if not isinstance(d, dict):
+        return False
+    if d.get("type") != "assistant":
+        return False
+    if not d.get("timestamp"):
+        return False
+    msg = d.get("message")
+    if not isinstance(msg, dict) or "usage" not in msg:
+        return False
+    return True
 
 
 def _live_fallback(cache):
@@ -186,16 +211,13 @@ def parse_sessions():
                 for line in f:
                     try:
                         d = json.loads(line)
-                        if d.get("type") != "assistant":
+                        if not _validate_jsonl_entry(d):
                             continue
-                        ts_str = d.get("timestamp")
-                        if not ts_str:
-                            continue
-                        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        ts = datetime.fromisoformat(d["timestamp"].replace("Z", "+00:00"))
                         if ts < window_7d:
                             continue
-                        usage = d.get("message", {}).get("usage", {})
-                        model = d.get("message", {}).get("model", "unknown")
+                        usage = d["message"].get("usage", {})
+                        model = d["message"].get("model", "unknown")
                         add_message_to(buckets["7d"], usage, model)
                         if ts >= today_start:
                             add_message_to(buckets["today"], usage, model)
@@ -222,14 +244,12 @@ def parse_history():
                 for line in f:
                     try:
                         d = json.loads(line)
-                        if d.get("type") != "assistant":
+                        if not _validate_jsonl_entry(d):
                             continue
-                        ts = datetime.fromisoformat(
-                            d.get("timestamp", "").replace("Z", "+00:00")
-                        )
+                        ts = datetime.fromisoformat(d["timestamp"].replace("Z", "+00:00"))
                         if ts < cutoff:
                             continue
-                        u   = d.get("message", {}).get("usage", {})
+                        u   = d["message"].get("usage", {})
                         inp = u.get("input_tokens", 0)
                         o   = u.get("output_tokens", 0)
                         cr  = u.get("cache_read_input_tokens", 0)
