@@ -73,16 +73,19 @@ def fmt_tokens(n):
 
 
 def get_oauth_token():
-    result = subprocess.run(
-        [SECURITY_BIN, "find-generic-password", "-s", "Claude Code-credentials", "-g"],
-        capture_output=True, text=True
-    )
-    output = result.stdout + result.stderr
-    if "password:" not in output:
+    try:
+        result = subprocess.run(
+            [SECURITY_BIN, "find-generic-password", "-s", "Claude Code-credentials", "-w"],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            log.warning("Keychain lookup failed (exit %d)", result.returncode)
+            return None
+        data = json.loads(result.stdout.strip())
+        return data.get("claudeAiOauth", {}).get("accessToken")
+    except (json.JSONDecodeError, KeyError) as e:
+        log.warning("Keychain password parse error: %s", e)
         return None
-    raw = output.split('password: "')[1].rstrip('"\n')
-    data = json.loads(raw)
-    return data.get("claudeAiOauth", {}).get("accessToken")
 
 
 def fetch_live_usage():
