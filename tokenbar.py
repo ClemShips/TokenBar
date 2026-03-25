@@ -39,16 +39,42 @@ from AppKit import (
 )
 from WebKit import WKWebView, WKWebViewConfiguration
 
-CLAUDE_DIR = os.path.expanduser("~/.claude")
-CACHE_DIR  = os.path.expanduser("~/.config/tokenbar")
-CACHE_FILE = os.path.join(CACHE_DIR, "cache.json")
+CLAUDE_DIR   = os.path.expanduser("~/.claude")
+CACHE_DIR    = os.path.expanduser("~/.config/tokenbar")
+CACHE_FILE   = os.path.join(CACHE_DIR, "cache.json")
+CONFIG_FILE  = os.path.join(CACHE_DIR, "config.json")
 
-PRICING = {
-    "input":        3.00 / 1_000_000,
-    "output":      15.00 / 1_000_000,
-    "cache_read":   0.30 / 1_000_000,
-    "cache_create": 3.75 / 1_000_000,
+DEFAULT_CONFIG = {
+    "refresh_interval": 60,
+    "currency": "$",
+    "menubar_display": "percent",
+    "alert_thresholds": [80, 95],
+    "pricing": {
+        "input":        3.00 / 1_000_000,
+        "output":      15.00 / 1_000_000,
+        "cache_read":   0.30 / 1_000_000,
+        "cache_create": 3.75 / 1_000_000,
+    },
 }
+
+PRICING = DEFAULT_CONFIG["pricing"].copy()
+
+
+def load_config():
+    config = DEFAULT_CONFIG.copy()
+    config["pricing"] = DEFAULT_CONFIG["pricing"].copy()
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            user = json.load(f)
+        if isinstance(user.get("pricing"), dict):
+            config["pricing"].update(user["pricing"])
+            user.pop("pricing")
+        config.update(user)
+    except FileNotFoundError:
+        pass
+    except (json.JSONDecodeError, TypeError) as e:
+        log.warning("Invalid config file, using defaults: %s", e)
+    return config
 
 SHORT_NAMES = {
     "claude-sonnet-4-6":          "Sonnet 4.6",
@@ -204,23 +230,24 @@ def empty_usage():
             "messages": 0, "cost": 0.0, "by_model": {}}
 
 
-def add_message_to(bucket, usage, model):
+def add_message_to(bucket, usage, model, pricing=None):
+    p = pricing or PRICING
     bucket["input"]        += usage.get("input_tokens", 0)
     bucket["output"]       += usage.get("output_tokens", 0)
     bucket["cache_read"]   += usage.get("cache_read_input_tokens", 0)
     bucket["cache_create"] += usage.get("cache_creation_input_tokens", 0)
     bucket["messages"]     += 1
     bucket["cost"] += (
-        usage.get("input_tokens", 0)                * PRICING["input"] +
-        usage.get("output_tokens", 0)               * PRICING["output"] +
-        usage.get("cache_read_input_tokens", 0)     * PRICING["cache_read"] +
-        usage.get("cache_creation_input_tokens", 0) * PRICING["cache_create"]
+        usage.get("input_tokens", 0)                * p["input"] +
+        usage.get("output_tokens", 0)               * p["output"] +
+        usage.get("cache_read_input_tokens", 0)     * p["cache_read"] +
+        usage.get("cache_creation_input_tokens", 0) * p["cache_create"]
     )
     m = short_model(model)
     bucket["by_model"][m] = bucket["by_model"].get(m, 0) + usage.get("output_tokens", 0)
 
 
-def parse_sessions():
+def parse_sessions(pricing=None):
     now         = datetime.now(timezone.utc)
     local_now   = datetime.now()
     today_start = datetime.combine(local_now.date(), datetime.min.time()).astimezone(timezone.utc)
@@ -246,11 +273,11 @@ def parse_sessions():
                             continue
                         usage = d["message"].get("usage", {})
                         model = d["message"].get("model", "unknown")
-                        add_message_to(buckets["7d"], usage, model)
+                        add_message_to(buckets["7d"], usage, model, pricing)
                         if ts >= today_start:
-                            add_message_to(buckets["today"], usage, model)
+                            add_message_to(buckets["today"], usage, model, pricing)
                         if ts >= month_start:
-                            add_message_to(buckets["month"], usage, model)
+                            add_message_to(buckets["month"], usage, model, pricing)
                     except Exception:
                         skipped_lines += 1
         except Exception as e:
@@ -261,7 +288,8 @@ def parse_sessions():
     return buckets
 
 
-def parse_history():
+def parse_history(pricing=None):
+    p = pricing or PRICING
     cutoff = datetime(2026, 1, 1, tzinfo=timezone.utc)
     msgs = out = cost = 0
     skipped_lines = 0
@@ -284,8 +312,8 @@ def parse_history():
                         cc  = u.get("cache_creation_input_tokens", 0)
                         msgs += 1
                         out  += o
-                        cost += (inp * PRICING["input"]       + o  * PRICING["output"] +
-                                 cr  * PRICING["cache_read"]  + cc * PRICING["cache_create"])
+                        cost += (inp * p["input"]       + o  * p["output"] +
+                                 cr  * p["cache_read"]  + cc * p["cache_create"])
                     except Exception:
                         skipped_lines += 1
         except Exception as e:
@@ -319,13 +347,16 @@ class AppDelegate(NSObject):
         self._webview = None
         self._popover = None
 
+        config = load_config()
+        interval = config.get("refresh_interval", 60)
+
         self._setup_status_item()
         self._setup_webview()
         self._setup_popover()
         self.start_refresh()
 
         NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            60.0, self,
+            float(interval), self,
             objc.selector(self.timerFired_, signature=b'v@:@'),
             None, True
         )
@@ -387,10 +418,12 @@ class AppDelegate(NSObject):
         threading.Thread(target=self._do_refresh, daemon=True).start()
 
     def _do_refresh(self):
+        config  = load_config()
+        pricing = config["pricing"]
         cache   = load_cache()
         live    = fetch_live_usage(cache)
-        local   = parse_sessions()
-        history = parse_history()
+        local   = parse_sessions(pricing)
+        history = parse_history(pricing)
 
         data = {
             "live":    live,
@@ -398,12 +431,21 @@ class AppDelegate(NSObject):
             "7d":      local["7d"],
             "month":   local["month"],
             "history": history,
+            "config":  {"currency": config["currency"]},
         }
         self._cached_data = data
         save_cache(cache)
 
+        display = config["menubar_display"]
         fh_pct = (live or {}).get("five_hour", {}).get("utilization")
-        if fh_pct is not None:
+        if display == "percent" and fh_pct is not None:
+            title = f"◆ {round(fh_pct)}%"
+        elif display == "cost_today":
+            sym = config["currency"]
+            title = f"◆ {sym}{local['today']['cost']:.2f}"
+        elif display == "tokens_today":
+            title = f"◆ {fmt_tokens(local['today']['output'])}"
+        elif fh_pct is not None:
             title = f"◆ {round(fh_pct)}%"
         else:
             title = f"◆ {fmt_tokens(local['today']['output'])}"

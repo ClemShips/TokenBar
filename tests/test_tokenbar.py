@@ -328,5 +328,51 @@ class TestScrubSecrets(unittest.TestCase):
         self.assertNotIn("accessToken", str(loaded))
 
 
+class TestLoadConfig(unittest.TestCase):
+    def test_defaults(self):
+        with patch.object(tokenbar, "CONFIG_FILE", "/nonexistent/config.json"):
+            config = tokenbar.load_config()
+        self.assertEqual(config["refresh_interval"], 60)
+        self.assertEqual(config["currency"], "$")
+        self.assertEqual(config["menubar_display"], "percent")
+        self.assertIn("input", config["pricing"])
+
+    def test_user_override(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"currency": "€", "refresh_interval": 30}, f)
+            path = f.name
+        try:
+            with patch.object(tokenbar, "CONFIG_FILE", path):
+                config = tokenbar.load_config()
+            self.assertEqual(config["currency"], "€")
+            self.assertEqual(config["refresh_interval"], 30)
+            self.assertIn("input", config["pricing"])
+        finally:
+            os.unlink(path)
+
+    def test_pricing_merge(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"pricing": {"output": 20.0 / 1_000_000}}, f)
+            path = f.name
+        try:
+            with patch.object(tokenbar, "CONFIG_FILE", path):
+                config = tokenbar.load_config()
+            self.assertEqual(config["pricing"]["output"], 20.0 / 1_000_000)
+            self.assertEqual(config["pricing"]["input"], 3.0 / 1_000_000)
+        finally:
+            os.unlink(path)
+
+    def test_invalid_config(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            f.write("NOT JSON")
+            path = f.name
+        try:
+            with patch.object(tokenbar, "CONFIG_FILE", path):
+                config = tokenbar.load_config()
+            self.assertEqual(config["refresh_interval"], 60)
+        finally:
+            os.unlink(path)
+
+
 if __name__ == "__main__":
     unittest.main()
