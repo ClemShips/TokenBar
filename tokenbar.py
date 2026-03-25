@@ -100,7 +100,11 @@ process.stdout.write(await r.text());
 """
 
 
+SKIP_MODELS = {"<synthetic>", "unknown", ""}
+
 def short_model(name):
+    if not name or name in SKIP_MODELS:
+        return None
     for k, v in SHORT_NAMES.items():
         if k in name:
             return v
@@ -244,7 +248,22 @@ def add_message_to(bucket, usage, model, pricing=None):
         usage.get("cache_creation_input_tokens", 0) * p["cache_create"]
     )
     m = short_model(model)
-    bucket["by_model"][m] = bucket["by_model"].get(m, 0) + usage.get("output_tokens", 0)
+    if not m:
+        return
+    if m not in bucket["by_model"]:
+        bucket["by_model"][m] = {"input": 0, "output": 0, "cache_read": 0, "cache_create": 0, "messages": 0, "cost": 0.0}
+    bm = bucket["by_model"][m]
+    bm["input"]        += usage.get("input_tokens", 0)
+    bm["output"]       += usage.get("output_tokens", 0)
+    bm["cache_read"]   += usage.get("cache_read_input_tokens", 0)
+    bm["cache_create"] += usage.get("cache_creation_input_tokens", 0)
+    bm["messages"]     += 1
+    bm["cost"] += (
+        usage.get("input_tokens", 0)                * p["input"] +
+        usage.get("output_tokens", 0)               * p["output"] +
+        usage.get("cache_read_input_tokens", 0)     * p["cache_read"] +
+        usage.get("cache_creation_input_tokens", 0) * p["cache_create"]
+    )
 
 
 def parse_sessions(pricing=None):
@@ -272,7 +291,7 @@ def parse_sessions(pricing=None):
                         if ts < window_7d:
                             continue
                         usage = d["message"].get("usage", {})
-                        model = d["message"].get("model", "unknown")
+                        model = d["message"].get("model") or "unknown"
                         add_message_to(buckets["7d"], usage, model, pricing)
                         if ts >= today_start:
                             add_message_to(buckets["today"], usage, model, pricing)

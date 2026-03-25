@@ -20,6 +20,10 @@ icon.iconset/
 TokenBar.icns
 icon.svg.png
 
+# Backlog interne
+IMPROVEMENTS.md
+IMPROVEMENTS-original.md
+
 # Python
 __pycache__/
 *.pyc

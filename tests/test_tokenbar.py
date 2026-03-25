@@ -67,6 +67,12 @@ class TestShortModel(unittest.TestCase):
         result = tokenbar.short_model("some-unknown-model-name")
         self.assertEqual(len(result), 16)
 
+    def test_synthetic_model(self):
+        self.assertIsNone(tokenbar.short_model("<synthetic>"))
+        self.assertIsNone(tokenbar.short_model("unknown"))
+        self.assertIsNone(tokenbar.short_model(""))
+        self.assertIsNone(tokenbar.short_model(None))
+
 
 class TestAddMessageTo(unittest.TestCase):
     def test_basic(self):
@@ -80,12 +86,18 @@ class TestAddMessageTo(unittest.TestCase):
         self.assertEqual(bucket["cache_read"], 200)
         self.assertEqual(bucket["cache_create"], 100)
         self.assertIn("Opus 4.6", bucket["by_model"])
+        bm = bucket["by_model"]["Opus 4.6"]
+        self.assertEqual(bm["messages"], 1)
+        self.assertEqual(bm["output"], 500)
+        self.assertEqual(bm["input"], 1000)
+        self.assertGreater(bm["cost"], 0)
 
     def test_cost_calculation(self):
         bucket = tokenbar.empty_usage()
         usage = {"input_tokens": 1_000_000, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
         tokenbar.add_message_to(bucket, usage, "claude-opus-4-6")
         self.assertAlmostEqual(bucket["cost"], 3.00)
+        self.assertAlmostEqual(bucket["by_model"]["Opus 4.6"]["cost"], 3.00)
 
     def test_multiple_messages(self):
         bucket = tokenbar.empty_usage()
@@ -97,12 +109,15 @@ class TestAddMessageTo(unittest.TestCase):
         self.assertEqual(bucket["input"], 2000)
         self.assertIn("Opus 4.6", bucket["by_model"])
         self.assertIn("Sonnet 4.6", bucket["by_model"])
+        self.assertEqual(bucket["by_model"]["Opus 4.6"]["messages"], 1)
+        self.assertEqual(bucket["by_model"]["Sonnet 4.6"]["messages"], 1)
 
     def test_empty_usage(self):
         bucket = tokenbar.empty_usage()
         tokenbar.add_message_to(bucket, {}, "claude-opus-4-6")
         self.assertEqual(bucket["messages"], 1)
         self.assertEqual(bucket["cost"], 0.0)
+        self.assertEqual(bucket["by_model"]["Opus 4.6"]["cost"], 0.0)
 
 
 class TestValidateJsonlEntry(unittest.TestCase):
