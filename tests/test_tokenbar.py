@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -271,6 +272,60 @@ class TestCache(unittest.TestCase):
             tokenbar.save_cache({"key": "value"})
             result = tokenbar.load_cache()
         self.assertEqual(result["key"], "value")
+
+
+class TestTokenRedactFilter(unittest.TestCase):
+    def setUp(self):
+        self.f = tokenbar.TokenRedactFilter()
+
+    def _make_record(self, msg, args=None):
+        return logging.LogRecord("test", logging.WARNING, "", 0, msg, args, None)
+
+    def test_redacts_token_in_msg(self):
+        record = self._make_record("token: sk-ant-abc123456789XYZDEFGHIJ")
+        self.f.filter(record)
+        self.assertIn("REDACTED", record.msg)
+        self.assertNotIn("XYZDEFGHIJ", record.msg)
+
+    def test_preserves_msg_without_token(self):
+        record = self._make_record("normal log message")
+        self.f.filter(record)
+        self.assertEqual(record.msg, "normal log message")
+
+    def test_redacts_token_in_args(self):
+        record = self._make_record("got %s", ("sk-ant-abc123456789XYZDEFGHIJ",))
+        self.f.filter(record)
+        self.assertIn("REDACTED", record.args[0])
+
+
+class TestScrubSecrets(unittest.TestCase):
+    def test_removes_access_token(self):
+        data = {"accessToken": "secret", "usage": 100}
+        clean = tokenbar._scrub_secrets(data)
+        self.assertNotIn("accessToken", clean)
+        self.assertEqual(clean["usage"], 100)
+
+    def test_removes_nested_tokens(self):
+        data = {"inner": {"refreshToken": "bad", "data": 1}}
+        clean = tokenbar._scrub_secrets(data)
+        self.assertNotIn("refreshToken", clean["inner"])
+        self.assertEqual(clean["inner"]["data"], 1)
+
+    def test_handles_lists(self):
+        data = [{"token": "secret", "ok": True}]
+        clean = tokenbar._scrub_secrets(data)
+        self.assertNotIn("token", clean[0])
+        self.assertTrue(clean[0]["ok"])
+
+    def test_cache_no_tokens(self):
+        cache = {"last_live": {"five_hour": {"utilization": 0.5}, "accessToken": "x"}}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_file = os.path.join(tmpdir, "cache.json")
+            with patch.object(tokenbar, "CACHE_FILE", cache_file), \
+                 patch.object(tokenbar, "CACHE_DIR", tmpdir):
+                tokenbar.save_cache(cache)
+                loaded = tokenbar.load_cache()
+        self.assertNotIn("accessToken", str(loaded))
 
 
 if __name__ == "__main__":

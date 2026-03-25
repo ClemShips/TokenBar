@@ -9,8 +9,26 @@ import subprocess
 import threading
 from datetime import datetime, timedelta, timezone
 
+import re
+
+
+class TokenRedactFilter(logging.Filter):
+    _pattern = re.compile(r'(sk-ant-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]*')
+
+    def filter(self, record):
+        if isinstance(record.msg, str):
+            record.msg = self._pattern.sub(r'\1…REDACTED', record.msg)
+        if record.args:
+            record.args = tuple(
+                self._pattern.sub(r'\1…REDACTED', str(a)) if isinstance(a, str) else a
+                for a in (record.args if isinstance(record.args, tuple) else (record.args,))
+            )
+        return True
+
+
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 log = logging.getLogger("tokenbar")
+log.addFilter(TokenRedactFilter())
 
 import objc
 from Foundation import NSObject, NSURL, NSTimer
@@ -79,12 +97,22 @@ def load_cache():
         return {}
 
 
+def _scrub_secrets(obj):
+    if isinstance(obj, dict):
+        return {k: _scrub_secrets(v) for k, v in obj.items()
+                if k not in ("accessToken", "refreshToken", "token")}
+    if isinstance(obj, list):
+        return [_scrub_secrets(i) for i in obj]
+    return obj
+
+
 def save_cache(cache):
     try:
         os.makedirs(CACHE_DIR, exist_ok=True)
+        clean = _scrub_secrets(cache)
         tmp = CACHE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(cache, f, ensure_ascii=False)
+            json.dump(clean, f, ensure_ascii=False)
         os.replace(tmp, CACHE_FILE)
     except OSError as e:
         log.warning("save_cache failed: %s", e)
