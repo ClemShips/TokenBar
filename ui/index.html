@@ -99,6 +99,19 @@ body {
   text-align: right;
   min-height: 14px;
 }
+.eta-warn {
+  font-size: 11px;
+  font-weight: 500;
+  color: #c53030;
+  text-align: right;
+}
+.day-delta {
+  font-size: 10px;
+  font-weight: 500;
+  margin-left: 4px;
+}
+.day-delta.up   { color: #c53030; }
+.day-delta.down { color: #7C9070; }
 
 .divider { height: 1px; background: #F0EFEC; margin: 2px 0; }
 
@@ -239,6 +252,7 @@ body {
         <div class="progress-fill fill-green" id="bar-5h"></div>
       </div>
       <div class="reset-time" id="reset-5h"></div>
+      <div class="eta-warn" id="eta-5h"></div>
       <div class="divider"></div>
       <div class="usage-row">
         <span>7 derniers jours</span>
@@ -263,7 +277,7 @@ body {
         <div class="stat-label">input</div>
       </div>
       <div class="stat">
-        <div class="stat-value" id="today-output">—</div>
+        <div class="stat-value" id="today-output">—<span class="day-delta" id="day-delta"></span></div>
         <div class="stat-label">output</div>
       </div>
       <div class="stat">
@@ -452,6 +466,25 @@ window.updateData = function(data) {
     set('pct-5h', '—'); set('reset-5h', 'API indisponible');
     set('pct-7d', '—'); set('reset-7d', 'API indisponible');
     document.getElementById('live-content').style.opacity = '0.5';
+  }
+
+  const etaEl = document.getElementById('eta-5h');
+  if (data.eta_min != null) {
+    const h = Math.floor(data.eta_min / 60);
+    const m = data.eta_min % 60;
+    const etaStr = h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' min';
+    etaEl.textContent = '⚠ limite dans ~' + etaStr;
+  } else {
+    etaEl.textContent = '';
+  }
+
+  const deltaEl = document.getElementById('day-delta');
+  if (data.day_delta != null) {
+    const sign = data.day_delta >= 0 ? '+' : '';
+    deltaEl.textContent = sign + data.day_delta + '%';
+    deltaEl.className = 'day-delta ' + (data.day_delta >= 0 ? 'up' : 'down');
+  } else {
+    deltaEl.textContent = '';
   }
 
   const t = data.today || {};

@@ -389,5 +389,108 @@ class TestLoadConfig(unittest.TestCase):
             os.unlink(path)
 
 
+class TestUtilizationHistory(unittest.TestCase):
+    def test_adds_point(self):
+        cache = {}
+        tokenbar.update_utilization_history(cache, 50.0)
+        self.assertEqual(len(cache["utilization_history"]), 1)
+        self.assertEqual(cache["utilization_history"][0]["pct"], 50.0)
+
+    def test_ignores_none(self):
+        cache = {}
+        tokenbar.update_utilization_history(cache, None)
+        self.assertNotIn("utilization_history", cache)
+
+    def test_detects_reset(self):
+        cache = {"utilization_history": [
+            {"ts": "2026-03-26T10:00:00+00:00", "pct": 80.0},
+            {"ts": "2026-03-26T10:01:00+00:00", "pct": 85.0},
+        ]}
+        tokenbar.update_utilization_history(cache, 10.0)
+        self.assertEqual(len(cache["utilization_history"]), 1)
+        self.assertEqual(cache["utilization_history"][0]["pct"], 10.0)
+
+    def test_caps_at_max(self):
+        cache = {"utilization_history": [
+            {"ts": f"2026-03-26T10:{i:02d}:00+00:00", "pct": float(i)}
+            for i in range(60)
+        ]}
+        tokenbar.update_utilization_history(cache, 99.0)
+        self.assertEqual(len(cache["utilization_history"]), 60)
+
+
+class TestEstimateTimeRemaining(unittest.TestCase):
+    def test_below_50_returns_none(self):
+        self.assertIsNone(tokenbar.estimate_time_remaining({}, 40))
+
+    def test_none_pct_returns_none(self):
+        self.assertIsNone(tokenbar.estimate_time_remaining({}, None))
+
+    def test_not_enough_data(self):
+        cache = {"utilization_history": [{"ts": "2026-03-26T10:00:00+00:00", "pct": 60}]}
+        self.assertIsNone(tokenbar.estimate_time_remaining(cache, 60))
+
+    def test_positive_velocity(self):
+        now = datetime.now(timezone.utc)
+        cache = {"utilization_history": [
+            {"ts": (now - timedelta(minutes=10)).isoformat(), "pct": 60.0},
+            {"ts": now.isoformat(), "pct": 70.0},
+        ]}
+        result = tokenbar.estimate_time_remaining(cache, 70.0)
+        self.assertIsNotNone(result)
+        self.assertEqual(result, 30)
+
+    def test_decreasing_velocity_returns_none(self):
+        now = datetime.now(timezone.utc)
+        cache = {"utilization_history": [
+            {"ts": (now - timedelta(minutes=10)).isoformat(), "pct": 80.0},
+            {"ts": now.isoformat(), "pct": 70.0},
+        ]}
+        self.assertIsNone(tokenbar.estimate_time_remaining(cache, 70.0))
+
+
+class TestYesterdaySummary(unittest.TestCase):
+    def test_first_run(self):
+        cache = {}
+        tokenbar.update_yesterday_summary(cache, {"output": 1000, "messages": 5, "cost": 1.0})
+        self.assertIn("pending_yesterday", cache)
+        self.assertIn("last_refresh_date", cache)
+        self.assertNotIn("yesterday_summary", cache)
+
+    def test_new_day_promotes_pending(self):
+        cache = {
+            "last_refresh_date": "2026-03-25",
+            "pending_yesterday": {"date": "2026-03-25", "output": 5000, "messages": 20, "cost": 5.0},
+        }
+        tokenbar.update_yesterday_summary(cache, {"output": 100, "messages": 1, "cost": 0.1})
+        self.assertEqual(cache["yesterday_summary"]["output"], 5000)
+
+    def test_same_day_no_promote(self):
+        today = datetime.now().strftime("%Y-%m-%d")
+        cache = {
+            "last_refresh_date": today,
+            "pending_yesterday": {"date": today, "output": 1000, "messages": 5, "cost": 1.0},
+        }
+        tokenbar.update_yesterday_summary(cache, {"output": 2000, "messages": 10, "cost": 2.0})
+        self.assertNotIn("yesterday_summary", cache)
+
+
+class TestDayComparison(unittest.TestCase):
+    def test_no_yesterday(self):
+        self.assertIsNone(tokenbar.compute_day_comparison({}, {"output": 1000}))
+
+    def test_yesterday_zero(self):
+        cache = {"yesterday_summary": {"output": 0}}
+        self.assertIsNone(tokenbar.compute_day_comparison(cache, {"output": 1000}))
+
+    def test_positive_delta(self):
+        cache = {"yesterday_summary": {"output": 1000}}
+        self.assertEqual(tokenbar.compute_day_comparison(cache, {"output": 1500}), 50)
+
+    def test_negative_delta(self):
+        cache = {"yesterday_summary": {"output": 1000}}
+        self.assertEqual(tokenbar.compute_day_comparison(cache, {"output": 800}), -20)
+
+
 if __name__ == "__main__":
     unittest.main()

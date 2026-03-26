@@ -229,6 +229,83 @@ def _live_fallback(cache):
     return cached
 
 
+MAX_HISTORY_POINTS = 60
+VELOCITY_WINDOW_MIN = 30
+RESET_DROP_THRESHOLD = 20
+
+
+def update_utilization_history(cache, pct):
+    if pct is None:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    history = cache.get("utilization_history", [])
+    if history:
+        last_pct = history[-1].get("pct", 0)
+        if last_pct - pct > RESET_DROP_THRESHOLD:
+            history = []
+    history.append({"ts": now, "pct": pct})
+    if len(history) > MAX_HISTORY_POINTS:
+        history = history[-MAX_HISTORY_POINTS:]
+    cache["utilization_history"] = history
+
+
+def estimate_time_remaining(cache, current_pct):
+    if current_pct is None or current_pct <= 50:
+        return None
+    history = cache.get("utilization_history", [])
+    if len(history) < 2:
+        return None
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(minutes=VELOCITY_WINDOW_MIN)
+    recent = [h for h in history if datetime.fromisoformat(h["ts"]) >= cutoff]
+    if len(recent) < 2:
+        recent = [history[0], history[-1]]
+    first, last = recent[0], recent[-1]
+    t0 = datetime.fromisoformat(first["ts"])
+    t1 = datetime.fromisoformat(last["ts"])
+    dt_min = (t1 - t0).total_seconds() / 60
+    if dt_min < 1:
+        return None
+    dp = last["pct"] - first["pct"]
+    if dp <= 0:
+        return None
+    velocity = dp / dt_min
+    remaining_pct = 100 - current_pct
+    remaining_min = remaining_pct / velocity
+    if remaining_min > 600:
+        return None
+    return round(remaining_min)
+
+
+def update_yesterday_summary(cache, today_stats):
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    last_date = cache.get("last_refresh_date")
+    if last_date and last_date != today_str:
+        pending = cache.get("pending_yesterday")
+        if pending:
+            cache["yesterday_summary"] = pending
+    cache["pending_yesterday"] = {
+        "date": today_str,
+        "output": today_stats.get("output", 0),
+        "messages": today_stats.get("messages", 0),
+        "cost": today_stats.get("cost", 0.0),
+    }
+    cache["last_refresh_date"] = today_str
+
+
+def compute_day_comparison(cache, today_stats):
+    yesterday = cache.get("yesterday_summary")
+    if not yesterday:
+        return None
+    y_out = yesterday.get("output", 0)
+    t_out = today_stats.get("output", 0)
+    if y_out == 0:
+        return None
+    delta_pct = round(((t_out - y_out) / y_out) * 100)
+    return delta_pct
+
+
 def empty_usage():
     return {"input": 0, "output": 0, "cache_read": 0, "cache_create": 0,
             "messages": 0, "cost": 0.0, "by_model": {}}
@@ -444,6 +521,13 @@ class AppDelegate(NSObject):
         local   = parse_sessions(pricing)
         history = parse_history(pricing)
 
+        fh = (live or {}).get("five_hour", {})
+        fh_pct_val = fh.get("utilization")
+        update_utilization_history(cache, fh_pct_val)
+        eta_min = estimate_time_remaining(cache, fh_pct_val)
+        update_yesterday_summary(cache, local["today"])
+        day_delta = compute_day_comparison(cache, local["today"])
+
         data = {
             "live":    live,
             "today":   local["today"],
@@ -451,12 +535,14 @@ class AppDelegate(NSObject):
             "month":   local["month"],
             "history": history,
             "config":  {"currency": config["currency"]},
+            "eta_min": eta_min,
+            "day_delta": day_delta,
         }
         self._cached_data = data
         save_cache(cache)
 
         display = config["menubar_display"]
-        fh_pct = (live or {}).get("five_hour", {}).get("utilization")
+        fh_pct = fh_pct_val
         if display == "percent" and fh_pct is not None:
             title = f"◆ {round(fh_pct)}%"
         elif display == "cost_today":
