@@ -4,15 +4,66 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=340">
 <style>
+:root {
+  --bg: #F7F6F3;
+  --card-bg: #fff;
+  --text: #2D2D2D;
+  --muted: #8E8E93;
+  --border: #F0EFEC;
+  --track: #F0EFEC;
+  --tab-bg: #F0EFEC;
+  --tab-active: #fff;
+  --badge-green-bg: rgba(124,144,112,.13);
+  --badge-green: #4A5D43;
+  --badge-orange-bg: rgba(212,132,94,.13);
+  --badge-orange: #D4845E;
+  --badge-red-bg: rgba(200,60,60,.13);
+  --badge-red: #c53030;
+  --fill-green: #7C9070;
+  --fill-orange: #D4845E;
+  --fill-red: #c53030;
+  --green: #7C9070;
+  --tooltip-bg: rgba(0,0,0,0.78);
+  --tooltip-text: #fff;
+  --shadow: rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1C1C1E;
+    --card-bg: #2C2C2E;
+    --text: #F2F2F7;
+    --muted: #98989D;
+    --border: #3A3A3C;
+    --track: #3A3A3C;
+    --tab-bg: #3A3A3C;
+    --tab-active: #48484A;
+    --badge-green-bg: rgba(124,144,112,.25);
+    --badge-green: #8BC07A;
+    --badge-orange-bg: rgba(212,132,94,.25);
+    --badge-orange: #FF9F5A;
+    --badge-red-bg: rgba(200,60,60,.25);
+    --badge-red: #FF6B6B;
+    --fill-green: #7C9070;
+    --fill-orange: #D4845E;
+    --fill-red: #c53030;
+    --green: #8BC07A;
+    --tooltip-bg: rgba(240,240,245,0.9);
+    --tooltip-text: #1C1C1E;
+    --shadow: rgba(0,0,0,0.18);
+  }
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+button:focus, button:focus-visible { outline: none; }
 
 body {
   font-family: -apple-system, 'Inter', sans-serif;
-  background: #F7F6F3;
-  color: #2D2D2D;
+  background: var(--bg);
+  color: var(--text);
   width: 340px;
   overflow-x: hidden;
   user-select: none;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .header {
@@ -20,10 +71,12 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 14px 16px;
-  background: #fff;
-  border-bottom: 1px solid #F0EFEC;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s, border-color 0.2s;
 }
 .header-left { display: flex; align-items: center; gap: 10px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
 .icon {
   width: 28px; height: 28px;
   background: #7C9070;
@@ -31,8 +84,25 @@ body {
   display: flex; align-items: center; justify-content: center;
   font-size: 15px;
 }
-.app-title { font-size: 14px; font-weight: 600; color: #2D2D2D; }
-.updated { font-size: 11px; color: #8E8E93; }
+.app-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.updated { font-size: 11px; color: var(--muted); }
+
+.compact-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.compact-toggle:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
 
 .content {
   padding: 12px;
@@ -44,19 +114,20 @@ body {
 .section-label {
   font-size: 10px;
   font-weight: 600;
-  color: #8E8E93;
+  color: var(--muted);
   letter-spacing: 0.8px;
   margin-top: 2px;
 }
 
 .card {
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 12px;
   padding: 14px 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: background 0.2s;
 }
 
 .usage-row {
@@ -65,44 +136,46 @@ body {
   align-items: center;
   font-size: 12px;
   font-weight: 500;
-  color: #2D2D2D;
+  color: var(--text);
 }
 .badge {
   font-size: 11px;
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 10px;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
-.badge-green  { background: rgba(124,144,112,.13); color: #4A5D43; }
-.badge-orange { background: rgba(212,132,94,.13);  color: #D4845E; }
-.badge-red    { background: rgba(200,60,60,.13);   color: #c53030; }
+.badge-green  { background: var(--badge-green-bg);  color: var(--badge-green); }
+.badge-orange { background: var(--badge-orange-bg); color: var(--badge-orange); }
+.badge-red    { background: var(--badge-red-bg);    color: var(--badge-red); }
 
 .progress-track {
   height: 6px;
-  background: #F0EFEC;
+  background: var(--track);
   border-radius: 3px;
   overflow: hidden;
+  transition: background 0.2s;
 }
 .progress-fill {
   height: 100%;
   border-radius: 3px;
-  transition: width 0.5s ease;
+  transition: width 0.5s ease, background-color 0.4s ease;
   width: 0%;
 }
-.fill-green  { background: #7C9070; }
-.fill-orange { background: #D4845E; }
-.fill-red    { background: #c53030; }
+.fill-green  { background-color: var(--fill-green); }
+.fill-orange { background-color: var(--fill-orange); }
+.fill-red    { background-color: var(--fill-red); }
 
 .reset-time {
   font-size: 11px;
-  color: #8E8E93;
+  color: var(--muted);
   text-align: right;
   min-height: 14px;
 }
 .eta-warn {
   font-size: 11px;
   font-weight: 500;
-  color: #c53030;
+  color: var(--badge-red);
   text-align: right;
 }
 .day-delta {
@@ -110,10 +183,10 @@ body {
   font-weight: 500;
   margin-left: 4px;
 }
-.day-delta.up   { color: #c53030; }
-.day-delta.down { color: #7C9070; }
+.day-delta.up   { color: var(--badge-red); }
+.day-delta.down { color: var(--green); }
 
-.divider { height: 1px; background: #F0EFEC; margin: 2px 0; }
+.divider { height: 1px; background: var(--border); margin: 2px 0; transition: background 0.2s; }
 
 .stats-grid {
   display: grid;
@@ -125,40 +198,42 @@ body {
   align-items: center;
   gap: 3px;
 }
-.stat-value       { font-size: 20px; font-weight: 600; color: #2D2D2D; line-height: 1.1; }
-.stat-value.green { color: #7C9070; }
+.stat-value       { font-size: 20px; font-weight: 600; color: var(--text); line-height: 1.1; }
+.stat-value.green { color: var(--green); }
 .stat-value.sm    { font-size: 16px; }
-.stat-label       { font-size: 10px; color: #8E8E93; }
+.stat-label       { font-size: 10px; color: var(--muted); }
 
 .cache-row {
   font-size: 11px;
-  color: #8E8E93;
+  color: var(--muted);
   text-align: center;
 }
 .tab-bar {
   display: flex;
-  background: #F0EFEC;
+  background: var(--tab-bg);
   border-radius: 8px;
   padding: 3px;
   gap: 0;
+  transition: background 0.2s;
 }
 .tab {
   flex: 1;
   text-align: center;
   font-size: 10px;
   font-weight: 500;
-  color: #8E8E93;
+  color: var(--muted);
   padding: 5px 0;
   border-radius: 6px;
   cursor: pointer;
   border: none;
   background: none;
   font-family: inherit;
+  transition: background 0.15s, color 0.15s;
 }
 .tab.active {
-  background: #fff;
+  background: var(--tab-active);
   font-weight: 600;
-  color: #2D2D2D;
+  color: var(--text);
   box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
 
@@ -168,16 +243,14 @@ body {
   border-radius: 2px;
   overflow: hidden;
 }
-.mini-bar-track div {
-  height: 100%;
-}
+.mini-bar-track div { height: 100%; }
 
 .legend-row {
   display: flex;
   justify-content: center;
   gap: 12px;
   font-size: 9px;
-  color: #8E8E93;
+  color: var(--muted);
 }
 .legend-item {
   display: flex;
@@ -212,9 +285,9 @@ body {
   gap: 4px;
   padding: 4px 0;
 }
-.btn-quit    { font-size: 12px; color: #8E8E93; }
-.btn-quit:hover { color: #2D2D2D; }
-.btn-refresh { font-size: 12px; color: #7C9070; font-weight: 500; }
+.btn-quit    { font-size: 12px; color: var(--muted); }
+.btn-quit:hover { color: var(--text); }
+.btn-refresh { font-size: 12px; color: var(--green); font-weight: 500; }
 .btn-refresh:hover { opacity: 0.7; }
 .spinner { display: none; }
 .spinner.spin { display: inline; animation: spin 1s linear infinite; }
@@ -222,10 +295,60 @@ body {
 
 .no-live {
   font-size: 11px;
-  color: #8E8E93;
+  color: var(--muted);
   font-style: italic;
   text-align: center;
   padding: 4px 0;
+}
+
+/* Compact / Detailed toggle */
+.view-compact  { display: none; }
+.is-compact .view-compact  { display: block; }
+.is-compact .view-detailed { display: none; }
+
+.compact-5h-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 8px var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: background 0.2s;
+}
+.compact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Tooltips */
+[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
 }
 </style>
 </head>
@@ -236,91 +359,121 @@ body {
     <div class="icon">📊</div>
     <span class="app-title">TokenBar</span>
   </div>
-  <span class="updated" id="updated">—</span>
+  <div class="header-right">
+    <button class="compact-toggle" id="compact-btn" onclick="toggleCompact()">Compact</button>
+    <span class="updated" id="updated">—</span>
+  </div>
 </div>
 
 <div class="content">
 
-  <div class="section-label">LIMITES D'UTILISATION</div>
-  <div class="card" id="live-card">
-    <div id="live-content">
-      <div class="usage-row">
-        <span>5 dernières heures</span>
-        <span class="badge badge-green" id="pct-5h">—</span>
+  <!-- VUE COMPACTE -->
+  <div class="view-compact">
+    <div class="compact-5h-card">
+      <div class="compact-row">
+        <span style="font-size:12px;font-weight:500;color:var(--text)">5 dernières heures</span>
+        <span class="badge badge-green" id="cpct-pct-5h">—</span>
       </div>
-      <div class="progress-track" style="margin-top:2px">
-        <div class="progress-fill fill-green" id="bar-5h"></div>
+      <div class="progress-track">
+        <div class="progress-fill fill-green" id="cpct-bar-5h"></div>
       </div>
-      <div class="reset-time" id="reset-5h"></div>
-      <div class="eta-warn" id="eta-5h"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="reset-time" id="cpct-reset-5h" style="text-align:left"></div>
+        <div class="eta-warn" id="cpct-eta-5h"></div>
+      </div>
       <div class="divider"></div>
-      <div class="usage-row">
-        <span>7 derniers jours</span>
-        <span class="badge badge-orange" id="pct-7d">—</span>
+      <div class="compact-row">
+        <span style="font-size:11px;color:var(--muted)">Aujourd'hui</span>
+        <span style="font-size:14px;font-weight:600;color:var(--green)" id="cpct-cost">—</span>
       </div>
-      <div class="progress-track" style="margin-top:2px">
-        <div class="progress-fill fill-orange" id="bar-7d"></div>
-      </div>
-      <div class="reset-time" id="reset-7d"></div>
     </div>
   </div>
 
-  <div class="section-label">AUJOURD'HUI</div>
-  <div class="card">
-    <div class="stats-grid">
+  <!-- VUE DÉTAILLÉE -->
+  <div class="view-detailed">
+
+    <div class="section-label">LIMITES D'UTILISATION</div>
+    <div class="card" id="live-card">
+      <div id="live-content">
+        <div class="usage-row">
+          <span>5 dernières heures</span>
+          <span class="badge badge-green" id="pct-5h">—</span>
+        </div>
+        <div class="progress-track" style="margin-top:2px">
+          <div class="progress-fill fill-green" id="bar-5h"></div>
+        </div>
+        <div class="reset-time" id="reset-5h"></div>
+        <div class="eta-warn" id="eta-5h"></div>
+        <div class="divider"></div>
+        <div class="usage-row">
+          <span>7 derniers jours</span>
+          <span class="badge badge-orange" id="pct-7d">—</span>
+        </div>
+        <div class="progress-track" style="margin-top:2px">
+          <div class="progress-fill fill-orange" id="bar-7d"></div>
+        </div>
+        <div class="reset-time" id="reset-7d"></div>
+      </div>
+    </div>
+
+    <div class="section-label">AUJOURD'HUI</div>
+    <div class="card">
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="stat-value" id="today-msgs">—</div>
+          <div class="stat-label" data-tooltip="Nombre d'appels API">messages</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="today-input">—</div>
+          <div class="stat-label" data-tooltip="Tokens envoyés à Claude">input</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="today-output">—<span class="day-delta" id="day-delta"></span></div>
+          <div class="stat-label" data-tooltip="Tokens générés par Claude">output</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value green" id="today-cost">—</div>
+          <div class="stat-label" data-tooltip="Estimation basée sur les tarifs publics">coût est.</div>
+        </div>
+      </div>
+      <div class="cache-row" id="today-cache" data-tooltip="Cache read = 10× moins cher · Cache write ≈ tarif input"></div>
+      <div class="tab-bar" id="model-tabs"></div>
+      <div class="mini-bar-track" id="model-bar"></div>
+      <div class="legend-row" id="model-legend"></div>
+    </div>
+
+    <div class="section-label">CE MOIS</div>
+    <div class="card compact-card">
       <div class="stat">
-        <div class="stat-value" id="today-msgs">—</div>
+        <div class="stat-value sm" id="month-msgs">—</div>
         <div class="stat-label">messages</div>
       </div>
       <div class="stat">
-        <div class="stat-value" id="today-input">—</div>
-        <div class="stat-label">input</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value" id="today-output">—<span class="day-delta" id="day-delta"></span></div>
+        <div class="stat-value sm" id="month-output">—</div>
         <div class="stat-label">output</div>
       </div>
       <div class="stat">
-        <div class="stat-value green" id="today-cost">—</div>
+        <div class="stat-value sm green" id="month-cost">—</div>
         <div class="stat-label">coût est.</div>
       </div>
     </div>
-    <div class="cache-row" id="today-cache"></div>
-    <div class="tab-bar" id="model-tabs"></div>
-    <div class="mini-bar-track" id="model-bar"></div>
-    <div class="legend-row" id="model-legend"></div>
-  </div>
 
-  <div class="section-label">CE MOIS</div>
-  <div class="card compact-card">
-    <div class="stat">
-      <div class="stat-value sm" id="month-msgs">—</div>
-      <div class="stat-label">messages</div>
+    <div class="section-label">DEPUIS JAN. 2026</div>
+    <div class="card compact-card">
+      <div class="stat">
+        <div class="stat-value sm" id="hist-msgs">—</div>
+        <div class="stat-label">messages</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value sm" id="hist-output">—</div>
+        <div class="stat-label">output</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value sm green" id="hist-cost">—</div>
+        <div class="stat-label">coût est.</div>
+      </div>
     </div>
-    <div class="stat">
-      <div class="stat-value sm" id="month-output">—</div>
-      <div class="stat-label">output</div>
-    </div>
-    <div class="stat">
-      <div class="stat-value sm green" id="month-cost">—</div>
-      <div class="stat-label">coût est.</div>
-    </div>
-  </div>
 
-  <div class="section-label">DEPUIS JAN. 2026</div>
-  <div class="card compact-card">
-    <div class="stat">
-      <div class="stat-value sm" id="hist-msgs">—</div>
-      <div class="stat-label">messages</div>
-    </div>
-    <div class="stat">
-      <div class="stat-value sm" id="hist-output">—</div>
-      <div class="stat-label">output</div>
-    </div>
-    <div class="stat">
-      <div class="stat-value sm green" id="hist-cost">—</div>
-      <div class="stat-label">coût est.</div>
-    </div>
   </div>
 
   <div class="footer">
@@ -368,8 +521,7 @@ function setPct(badgeId, barId, pct) {
   const bar   = document.getElementById(barId);
   badge.textContent = Math.round(pct) + '%';
   bar.style.width   = Math.min(pct, 100) + '%';
-
-  let cls = pct >= 80 ? 'red' : pct >= 50 ? 'orange' : 'green';
+  const cls = pct >= 80 ? 'red' : pct >= 50 ? 'orange' : 'green';
   badge.className = 'badge badge-' + cls;
   bar.className   = 'progress-fill fill-' + cls;
 }
@@ -386,8 +538,45 @@ const MODEL_COLORS = {
 };
 function modelColor(name) { return MODEL_COLORS[name] || '#8E8E93'; }
 
-let _lastData = null;
-let _activeTab = 'all';
+let _lastData   = null;
+let _activeTab  = 'all';
+let _isCompact  = false;
+
+const COMPACT_H = 252;
+const DETAIL_H  = 620;
+
+function applyCompact(compact) {
+  _isCompact = compact;
+  document.body.classList.toggle('is-compact', compact);
+  document.getElementById('compact-btn').textContent = compact ? 'Détail' : 'Compact';
+  window.webkit.messageHandlers.action.postMessage({
+    type: 'resize',
+    height: compact ? COMPACT_H : DETAIL_H
+  });
+}
+
+function toggleCompact() {
+  const next = !_isCompact;
+  localStorage.setItem('compact_mode', next ? '1' : '0');
+  applyCompact(next);
+  if (_lastData && next) updateCompactView(_lastData);
+}
+
+function updateCompactView(data) {
+  const fh  = (data.live || {}).five_hour || {};
+  const pct = fh.utilization || 0;
+  setPct('cpct-pct-5h', 'cpct-bar-5h', pct);
+  set('cpct-reset-5h', fmtReset(fh.resets_at));
+  const etaEl = document.getElementById('cpct-eta-5h');
+  if (data.eta_min != null) {
+    const h = Math.floor(data.eta_min / 60);
+    const m = data.eta_min % 60;
+    etaEl.textContent = '⚠ ~' + (h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' min');
+  } else {
+    etaEl.textContent = '';
+  }
+  set('cpct-cost', fmtCost((data.today || {}).cost || 0));
+}
 
 function showTodayStats(src) {
   set('today-msgs',   fmtNum(src.messages || 0));
@@ -399,18 +588,16 @@ function showTodayStats(src) {
 }
 
 function buildModelUI(t) {
-  const models = t.by_model || {};
-  const sorted = Object.entries(models).sort((a, b) => b[1].output - a[1].output);
+  const models  = t.by_model || {};
+  const sorted  = Object.entries(models).sort((a, b) => b[1].output - a[1].output);
   const totalOut = t.output || 1;
 
   const tabBar = document.getElementById('model-tabs');
-  const bar = document.getElementById('model-bar');
+  const bar    = document.getElementById('model-bar');
   const legend = document.getElementById('model-legend');
 
   if (sorted.length === 0) {
-    tabBar.innerHTML = '';
-    bar.innerHTML = '';
-    legend.innerHTML = '';
+    tabBar.innerHTML = bar.innerHTML = legend.innerHTML = '';
     return;
   }
 
@@ -424,23 +611,19 @@ function buildModelUI(t) {
       this.classList.add('active');
       if (_activeTab === 'all') {
         showTodayStats(t);
-        bar.style.display = '';
-        legend.style.display = '';
+        bar.style.display = legend.style.display = '';
       } else {
         showTodayStats(models[_activeTab] || {messages:0,input:0,output:0,cost:0,cache_read:0,cache_create:0});
-        bar.style.display = 'none';
-        legend.style.display = 'none';
+        bar.style.display = legend.style.display = 'none';
       }
     };
   });
 
-  bar.style.display = '';
-  legend.style.display = '';
+  bar.style.display = legend.style.display = '';
   bar.innerHTML = sorted.map(([m, s]) => {
     const pct = Math.max((s.output / totalOut) * 100, 1);
     return '<div style="width:' + pct + '%;background:' + modelColor(m) + '"></div>';
   }).join('');
-
   legend.innerHTML = sorted.map(([m, s]) => {
     const pct = Math.round((s.output / totalOut) * 100);
     return '<span class="legend-item"><span class="legend-dot" style="background:' + modelColor(m) + '"></span>' + m.split(' ')[0] + ' ' + pct + '%</span>';
@@ -455,8 +638,8 @@ window.updateData = function(data) {
     String(now.getMinutes()).padStart(2,'0'));
 
   if (data.live) {
-    const fh = data.live.five_hour  || {};
-    const sd = data.live.seven_day  || {};
+    const fh = data.live.five_hour || {};
+    const sd = data.live.seven_day || {};
     setPct('pct-5h', 'bar-5h', fh.utilization || 0);
     set('reset-5h', fmtReset(fh.resets_at));
     setPct('pct-7d', 'bar-7d', sd.utilization || 0);
@@ -472,8 +655,7 @@ window.updateData = function(data) {
   if (data.eta_min != null) {
     const h = Math.floor(data.eta_min / 60);
     const m = data.eta_min % 60;
-    const etaStr = h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' min';
-    etaEl.textContent = '⚠ limite dans ~' + etaStr;
+    etaEl.textContent = '⚠ limite dans ~' + (h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' min');
   } else {
     etaEl.textContent = '';
   }
@@ -491,8 +673,7 @@ window.updateData = function(data) {
   if (_activeTab === 'all') {
     showTodayStats(t);
   } else {
-    const models = t.by_model || {};
-    showTodayStats(models[_activeTab] || {messages:0,input:0,output:0,cost:0,cache_read:0,cache_create:0});
+    showTodayStats((t.by_model || {})[_activeTab] || {messages:0,input:0,output:0,cost:0,cache_read:0,cache_create:0});
   }
   buildModelUI(t);
 
@@ -505,6 +686,8 @@ window.updateData = function(data) {
   set('hist-msgs',   fmtNum(h.msgs    || 0));
   set('hist-output', fmtTokens(h.out  || 0));
   set('hist-cost',   fmtCost(h.cost   || 0));
+
+  if (_isCompact) updateCompactView(data);
 };
 
 function doQuit() {
@@ -513,6 +696,12 @@ function doQuit() {
 function doRefresh() {
   window.webkit.messageHandlers.action.postMessage({ type: 'refresh' });
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (localStorage.getItem('compact_mode') === '1') {
+    applyCompact(true);
+  }
+});
 </script>
 </body>
 </html>

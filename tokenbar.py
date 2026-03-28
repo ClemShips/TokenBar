@@ -599,6 +599,14 @@ class ActionHandler(NSObject):
         elif action_type == "refresh":
             if self.delegate:
                 self.delegate.start_refresh()
+        elif action_type == "resize":
+            try:
+                h = int(body["height"]) if hasattr(body, "__getitem__") else 620
+                h = max(150, min(700, h))
+            except (KeyError, TypeError, ValueError):
+                h = 620
+            if self.delegate:
+                self.delegate.resizePopover_(h)
 
 
 class AppDelegate(NSObject):
@@ -644,6 +652,7 @@ class AppDelegate(NSObject):
         self._webview = WKWebView.alloc().initWithFrame_configuration_(
             NSMakeRect(0, 0, 340, 620), config
         )
+        self._webview.setAutoresizingMask_(18)
 
         if getattr(sys, "frozen", False):
             res = os.path.join(os.path.dirname(sys.executable), "..", "Resources")
@@ -663,6 +672,9 @@ class AppDelegate(NSObject):
         vc = NSViewController.alloc().init()
         vc.setView_(self._webview)
         self._popover.setContentViewController_(vc)
+
+    def resizePopover_(self, height):
+        self._popover.setContentSize_(NSMakeSize(340, float(height)))
 
     def togglePopover_(self, sender):
         if self._popover.isShown():
