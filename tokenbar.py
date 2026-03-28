@@ -36,8 +36,110 @@ from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength,
     NSPopover, NSPopoverBehaviorTransient,
     NSViewController, NSMakeSize, NSMakeRect, NSRectEdgeMinY,
+    NSSound,
 )
 from WebKit import WKWebView, WKWebViewConfiguration
+
+try:
+    objc.loadBundle(
+        "UserNotifications",
+        bundle_path="/System/Library/Frameworks/UserNotifications.framework",
+        module_globals=globals(),
+    )
+    UNUserNotificationCenter = objc.lookUpClass("UNUserNotificationCenter")
+    UNMutableNotificationContent = objc.lookUpClass("UNMutableNotificationContent")
+    UNNotificationRequest = objc.lookUpClass("UNNotificationRequest")
+    UNNotificationSound = objc.lookUpClass("UNNotificationSound")
+
+    objc.registerMetaDataForSelector(
+        b"UNUserNotificationCenter",
+        b"requestAuthorizationWithOptions:completionHandler:",
+        {
+            "arguments": {
+                3: {
+                    "callable": {
+                        "retval": {"type": b"v"},
+                        "arguments": {
+                            0: {"type": b"^v"},
+                            1: {"type": b"Z"},
+                            2: {"type": b"@"},
+                        },
+                    }
+                }
+            }
+        },
+    )
+
+    objc.registerMetaDataForSelector(
+        b"UNUserNotificationCenter",
+        b"addNotificationRequest:withCompletionHandler:",
+        {
+            "arguments": {
+                3: {
+                    "callable": {
+                        "retval": {"type": b"v"},
+                        "arguments": {
+                            0: {"type": b"^v"},
+                            1: {"type": b"@"},
+                        },
+                    }
+                }
+            }
+        },
+    )
+
+    _app_delegate_ref = None
+
+    class _UNDelegate(NSObject):
+        def userNotificationCenter_willPresentNotification_withCompletionHandler_(self, center, notification, handler):
+            handler(0x07)
+
+        def userNotificationCenter_didReceiveNotificationResponse_withCompletionHandler_(self, center, response, handler):
+            if _app_delegate_ref and hasattr(_app_delegate_ref, 'togglePopover_'):
+                _app_delegate_ref.togglePopover_(None)
+            handler()
+
+    objc.registerMetaDataForSelector(
+        b"_UNDelegate",
+        b"userNotificationCenter:willPresentNotification:withCompletionHandler:",
+        {
+            "arguments": {
+                4: {
+                    "callable": {
+                        "retval": {"type": b"v"},
+                        "arguments": {
+                            0: {"type": b"^v"},
+                            1: {"type": b"Q"},
+                        },
+                    }
+                }
+            }
+        },
+    )
+
+    objc.registerMetaDataForSelector(
+        b"_UNDelegate",
+        b"userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:",
+        {
+            "arguments": {
+                4: {
+                    "callable": {
+                        "retval": {"type": b"v"},
+                        "arguments": {
+                            0: {"type": b"^v"},
+                        },
+                    }
+                }
+            }
+        },
+    )
+
+    _un_delegate = _UNDelegate.alloc().init()
+    _HAS_UN = True
+except Exception as e:
+    _HAS_UN = False
+    _un_delegate = None
+    log.warning("UserNotifications framework not available: %s", e)
 
 CLAUDE_DIR   = os.path.expanduser("~/.claude")
 CACHE_DIR    = os.path.expanduser("~/.config/tokenbar")
@@ -49,6 +151,7 @@ DEFAULT_CONFIG = {
     "currency": "$",
     "menubar_display": "percent",
     "alert_thresholds": [80, 95],
+    "alert_sound": "Glass",
     "pricing": {
         "input":        3.00 / 1_000_000,
         "output":      15.00 / 1_000_000,
@@ -227,6 +330,68 @@ def _live_fallback(cache):
         cached["_stale"] = True
         cached["_stale_since"] = ts
     return cached
+
+
+def request_notification_permission():
+    if not _HAS_UN:
+        return
+    center = UNUserNotificationCenter.currentNotificationCenter()
+    if _un_delegate:
+        center.setDelegate_(_un_delegate)
+    center.requestAuthorizationWithOptions_completionHandler_(
+        0x06,
+        lambda granted, error: log.debug("Notification permission granted=%s error=%s", granted, error),
+    )
+
+
+def play_alert_sound(sound_name):
+    if not sound_name:
+        return
+    path = f"/System/Library/Sounds/{sound_name}.aiff"
+    sound = NSSound.alloc().initWithContentsOfFile_byReference_(path, True)
+    if sound:
+        sound.play()
+
+
+def send_threshold_notification(pct, threshold, sound_name):
+    if _HAS_UN:
+        try:
+            center = UNUserNotificationCenter.currentNotificationCenter()
+            content = UNMutableNotificationContent.alloc().init()
+            content.setTitle_("TokenBar")
+            if threshold >= 95:
+                content.setBody_(f"Utilisation critique : {round(pct)}% de la limite 5h atteinte")
+            else:
+                content.setBody_(f"Attention : {round(pct)}% de la limite 5h atteinte")
+            if sound_name:
+                content.setSound_(UNNotificationSound.defaultSound())
+            request = UNNotificationRequest.requestWithIdentifier_content_trigger_(
+                f"tokenbar-threshold-{threshold}", content, None
+            )
+            center.addNotificationRequest_withCompletionHandler_(
+                request,
+                lambda error: log.warning("Notification error: %s", error) if error else None,
+            )
+        except Exception as e:
+            log.warning("Failed to send notification: %s", e)
+    play_alert_sound(sound_name)
+
+
+def check_thresholds(cache, pct, config):
+    if pct is None:
+        return
+    thresholds = config.get("alert_thresholds", [80, 95])
+    sound_name = config.get("alert_sound", "Glass")
+    notified = set(cache.get("notified_thresholds", []))
+    last_pct = cache.get("last_threshold_pct")
+    if last_pct is not None and last_pct - pct > RESET_DROP_THRESHOLD:
+        notified = set()
+    for t in sorted(thresholds):
+        if pct >= t and t not in notified:
+            send_threshold_notification(pct, t, sound_name)
+            notified.add(t)
+    cache["notified_thresholds"] = list(notified)
+    cache["last_threshold_pct"] = pct
 
 
 MAX_HISTORY_POINTS = 60
@@ -449,6 +614,9 @@ class AppDelegate(NSObject):
         self._setup_status_item()
         self._setup_webview()
         self._setup_popover()
+        global _app_delegate_ref
+        _app_delegate_ref = self
+        request_notification_permission()
         self.start_refresh()
 
         NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
@@ -527,6 +695,7 @@ class AppDelegate(NSObject):
         eta_min = estimate_time_remaining(cache, fh_pct_val)
         update_yesterday_summary(cache, local["today"])
         day_delta = compute_day_comparison(cache, local["today"])
+        check_thresholds(cache, fh_pct_val, config)
 
         data = {
             "live":    live,

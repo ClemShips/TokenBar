@@ -492,5 +492,51 @@ class TestDayComparison(unittest.TestCase):
         self.assertEqual(tokenbar.compute_day_comparison(cache, {"output": 800}), -20)
 
 
+class TestCheckThresholds(unittest.TestCase):
+    def setUp(self):
+        self.config = {"alert_thresholds": [80, 95], "alert_sound": "Glass"}
+
+    @patch("tokenbar.send_threshold_notification")
+    def test_triggers_at_80(self, mock_notify):
+        cache = {}
+        tokenbar.check_thresholds(cache, 82, self.config)
+        mock_notify.assert_called_once_with(82, 80, "Glass")
+        self.assertIn(80, cache["notified_thresholds"])
+
+    @patch("tokenbar.send_threshold_notification")
+    def test_triggers_both(self, mock_notify):
+        cache = {}
+        tokenbar.check_thresholds(cache, 96, self.config)
+        self.assertEqual(mock_notify.call_count, 2)
+        self.assertIn(80, cache["notified_thresholds"])
+        self.assertIn(95, cache["notified_thresholds"])
+
+    @patch("tokenbar.send_threshold_notification")
+    def test_no_spam(self, mock_notify):
+        cache = {"notified_thresholds": [80], "last_threshold_pct": 82}
+        tokenbar.check_thresholds(cache, 85, self.config)
+        mock_notify.assert_not_called()
+
+    @patch("tokenbar.send_threshold_notification")
+    def test_reset_clears_notified(self, mock_notify):
+        cache = {"notified_thresholds": [80, 95], "last_threshold_pct": 96}
+        tokenbar.check_thresholds(cache, 10, self.config)
+        self.assertEqual(cache["notified_thresholds"], [])
+        mock_notify.assert_not_called()
+
+    @patch("tokenbar.send_threshold_notification")
+    def test_none_pct_skips(self, mock_notify):
+        cache = {}
+        tokenbar.check_thresholds(cache, None, self.config)
+        mock_notify.assert_not_called()
+
+    @patch("tokenbar.send_threshold_notification")
+    def test_after_reset_renotifies(self, mock_notify):
+        cache = {"notified_thresholds": [80, 95], "last_threshold_pct": 96}
+        tokenbar.check_thresholds(cache, 10, self.config)
+        tokenbar.check_thresholds(cache, 85, self.config)
+        mock_notify.assert_called_once_with(85, 80, "Glass")
+
+
 if __name__ == "__main__":
     unittest.main()
