@@ -31,7 +31,7 @@ log = logging.getLogger("tokenbar")
 log.addFilter(TokenRedactFilter())
 
 import objc
-from Foundation import NSObject, NSURL, NSTimer
+from Foundation import NSObject, NSURL, NSTimer, NSLocale
 from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength,
     NSPopover, NSPopoverBehaviorTransient,
@@ -180,6 +180,30 @@ def load_config():
     except (json.JSONDecodeError, TypeError) as e:
         log.warning("Invalid config file, using defaults: %s", e)
     return config
+
+MENU_STRINGS = {
+    "fr": {
+        "copy_stats":  "Copier les stats",
+        "dashboard":   "Dashboard Anthropic",
+        "preferences": "Préférences...",
+        "quit":        "Quitter",
+    },
+    "en": {
+        "copy_stats":  "Copy stats",
+        "dashboard":   "Anthropic Dashboard",
+        "preferences": "Preferences...",
+        "quit":        "Quit",
+    },
+}
+
+
+def detect_lang():
+    langs = NSLocale.preferredLanguages()
+    for l in langs:
+        if str(l).lower().startswith("fr"):
+            return "fr"
+    return "en"
+
 
 SHORT_NAMES = {
     "claude-sonnet-4-6":          "Sonnet 4.6",
@@ -617,6 +641,7 @@ class AppDelegate(NSObject):
         self._cached_data = None
         self._webview = None
         self._popover = None
+        self._lang = detect_lang()
 
         config = load_config()
         interval = config.get("refresh_interval", 60)
@@ -684,10 +709,11 @@ class AppDelegate(NSObject):
             self.togglePopover_(sender)
 
     def _show_context_menu(self):
+        s = MENU_STRINGS.get(self._lang, MENU_STRINGS["en"])
         menu = NSMenu.alloc().init()
 
         copy_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            "Copier les stats", objc.selector(self.copyStats_, signature=b'v@:@'), "")
+            s["copy_stats"], objc.selector(self.copyStats_, signature=b'v@:@'), "")
         copy_item.setTarget_(self)
         copy_item.setEnabled_(self._cached_data is not None)
         menu.addItem_(copy_item)
@@ -695,19 +721,19 @@ class AppDelegate(NSObject):
         menu.addItem_(NSMenuItem.separatorItem())
 
         dash_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            "Dashboard Anthropic", objc.selector(self.openDashboard_, signature=b'v@:@'), "")
+            s["dashboard"], objc.selector(self.openDashboard_, signature=b'v@:@'), "")
         dash_item.setTarget_(self)
         menu.addItem_(dash_item)
 
         prefs_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            "Préférences...", objc.selector(self.openPreferences_, signature=b'v@:@'), "")
+            s["preferences"], objc.selector(self.openPreferences_, signature=b'v@:@'), "")
         prefs_item.setTarget_(self)
         menu.addItem_(prefs_item)
 
         menu.addItem_(NSMenuItem.separatorItem())
 
         quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            "Quitter", objc.selector(self.quitApp_, signature=b'v@:@'), "q")
+            s["quit"], objc.selector(self.quitApp_, signature=b'v@:@'), "q")
         quit_item.setTarget_(self)
         menu.addItem_(quit_item)
 
@@ -793,6 +819,7 @@ class AppDelegate(NSObject):
             "month":   local["month"],
             "history": history,
             "config":  {"currency": config["currency"]},
+            "lang":    self._lang,
             "eta_min": eta_min,
             "day_delta": day_delta,
         }

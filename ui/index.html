@@ -371,7 +371,7 @@ body {
   <div class="view-compact">
     <div class="compact-5h-card">
       <div class="compact-row">
-        <span style="font-size:12px;font-weight:500;color:var(--text)">5 dernières heures</span>
+        <span style="font-size:12px;font-weight:500;color:var(--text)" data-i18n="lbl_5h">5 dernières heures</span>
         <span class="badge badge-green" id="cpct-pct-5h">—</span>
       </div>
       <div class="progress-track">
@@ -383,7 +383,7 @@ body {
       </div>
       <div class="divider"></div>
       <div class="compact-row">
-        <span style="font-size:11px;color:var(--muted)">Aujourd'hui</span>
+        <span style="font-size:11px;color:var(--muted)" data-i18n="today_compact">Aujourd'hui</span>
         <span style="font-size:14px;font-weight:600;color:var(--green)" id="cpct-cost">—</span>
       </div>
     </div>
@@ -392,11 +392,11 @@ body {
   <!-- VUE DÉTAILLÉE -->
   <div class="view-detailed">
 
-    <div class="section-label">LIMITES D'UTILISATION</div>
+    <div class="section-label" data-i18n="sec_limits">LIMITES D'UTILISATION</div>
     <div class="card" id="live-card">
       <div id="live-content">
         <div class="usage-row">
-          <span>5 dernières heures</span>
+          <span data-i18n="lbl_5h">5 dernières heures</span>
           <span class="badge badge-green" id="pct-5h">—</span>
         </div>
         <div class="progress-track" style="margin-top:2px">
@@ -406,7 +406,7 @@ body {
         <div class="eta-warn" id="eta-5h"></div>
         <div class="divider"></div>
         <div class="usage-row">
-          <span>7 derniers jours</span>
+          <span data-i18n="lbl_7d">7 derniers jours</span>
           <span class="badge badge-orange" id="pct-7d">—</span>
         </div>
         <div class="progress-track" style="margin-top:2px">
@@ -416,76 +416,164 @@ body {
       </div>
     </div>
 
-    <div class="section-label">AUJOURD'HUI</div>
+    <div class="section-label" data-i18n="sec_today">AUJOURD'HUI</div>
     <div class="card">
       <div class="stats-grid">
         <div class="stat">
           <div class="stat-value" id="today-msgs">—</div>
-          <div class="stat-label" data-tooltip="Nombre d'appels API">messages</div>
+          <div class="stat-label" data-i18n="messages" data-i18n-tooltip="tooltip_messages">messages</div>
         </div>
         <div class="stat">
           <div class="stat-value" id="today-input">—</div>
-          <div class="stat-label" data-tooltip="Tokens envoyés à Claude">input</div>
+          <div class="stat-label" data-i18n="input" data-i18n-tooltip="tooltip_input">input</div>
         </div>
         <div class="stat">
           <div class="stat-value" id="today-output">—<span class="day-delta" id="day-delta"></span></div>
-          <div class="stat-label" data-tooltip="Tokens générés par Claude">output</div>
+          <div class="stat-label" data-i18n="output" data-i18n-tooltip="tooltip_output">output</div>
         </div>
         <div class="stat">
           <div class="stat-value green" id="today-cost">—</div>
-          <div class="stat-label" data-tooltip="Estimation basée sur les tarifs publics">coût est.</div>
+          <div class="stat-label" data-i18n="cost" data-i18n-tooltip="tooltip_cost">coût est.</div>
         </div>
       </div>
-      <div class="cache-row" id="today-cache" data-tooltip="Cache read = 10× moins cher · Cache write ≈ tarif input"></div>
+      <div class="cache-row" id="today-cache" data-i18n-tooltip="tooltip_cache"></div>
       <div class="tab-bar" id="model-tabs"></div>
       <div class="mini-bar-track" id="model-bar"></div>
       <div class="legend-row" id="model-legend"></div>
     </div>
 
-    <div class="section-label">CE MOIS</div>
+    <div class="section-label" data-i18n="sec_month">CE MOIS</div>
     <div class="card compact-card">
       <div class="stat">
         <div class="stat-value sm" id="month-msgs">—</div>
-        <div class="stat-label">messages</div>
+        <div class="stat-label" data-i18n="messages">messages</div>
       </div>
       <div class="stat">
         <div class="stat-value sm" id="month-output">—</div>
-        <div class="stat-label">output</div>
+        <div class="stat-label" data-i18n="output">output</div>
       </div>
       <div class="stat">
         <div class="stat-value sm green" id="month-cost">—</div>
-        <div class="stat-label">coût est.</div>
+        <div class="stat-label" data-i18n="cost">coût est.</div>
       </div>
     </div>
 
-    <div class="section-label">DEPUIS JAN. 2026</div>
+    <div class="section-label" data-i18n="sec_history">DEPUIS JAN. 2026</div>
     <div class="card compact-card">
       <div class="stat">
         <div class="stat-value sm" id="hist-msgs">—</div>
-        <div class="stat-label">messages</div>
+        <div class="stat-label" data-i18n="messages">messages</div>
       </div>
       <div class="stat">
         <div class="stat-value sm" id="hist-output">—</div>
-        <div class="stat-label">output</div>
+        <div class="stat-label" data-i18n="output">output</div>
       </div>
       <div class="stat">
         <div class="stat-value sm green" id="hist-cost">—</div>
-        <div class="stat-label">coût est.</div>
+        <div class="stat-label" data-i18n="cost">coût est.</div>
       </div>
     </div>
 
   </div>
 
   <div class="footer">
-    <button class="btn btn-quit" onclick="doQuit()">Quitter</button>
+    <button class="btn btn-quit" id="btn-quit" onclick="doQuit()">Quitter</button>
     <button class="btn btn-refresh" onclick="doRefresh()" id="refresh-btn">
-      <span id="refresh-icon">↺</span> Actualiser
+      <span id="refresh-icon">↺</span> <span id="refresh-text">Actualiser</span>
     </button>
   </div>
 
 </div>
 
 <script>
+const STRINGS = {
+  fr: {
+    updated:          'Mis à jour · ',
+    compact:          'Compact',
+    detail:           'Détail',
+    sec_limits:       "LIMITES D'UTILISATION",
+    lbl_5h:           '5 dernières heures',
+    lbl_7d:           '7 derniers jours',
+    sec_today:        "AUJOURD'HUI",
+    messages:         'messages',
+    input:            'input',
+    output:           'output',
+    cost:             'coût est.',
+    sec_month:        'CE MOIS',
+    sec_history:      'DEPUIS JAN. 2026',
+    quit:             'Quitter',
+    refresh:          'Actualiser',
+    api_unavailable:  'API indisponible',
+    expired:          'expiré',
+    reset_in:         'reset dans',
+    limit_in:         '⚠ limite dans ~',
+    eta_short:        '⚠ ~',
+    min:              'min',
+    all_tab:          'Tous',
+    cache_label:      'Cache · ',
+    today_compact:    "Aujourd'hui",
+    day_suffix:       'j',
+    tooltip_messages: "Nombre d'appels API",
+    tooltip_input:    'Tokens envoyés à Claude',
+    tooltip_output:   'Tokens générés par Claude',
+    tooltip_cost:     'Estimation basée sur les tarifs publics',
+    tooltip_cache:    'Cache read = 10× moins cher · Cache write ≈ tarif input',
+  },
+  en: {
+    updated:          'Updated · ',
+    compact:          'Compact',
+    detail:           'Detail',
+    sec_limits:       'USAGE LIMITS',
+    lbl_5h:           'Last 5 hours',
+    lbl_7d:           'Last 7 days',
+    sec_today:        'TODAY',
+    messages:         'messages',
+    input:            'input',
+    output:           'output',
+    cost:             'est. cost',
+    sec_month:        'THIS MONTH',
+    sec_history:      'SINCE JAN. 2026',
+    quit:             'Quit',
+    refresh:          'Refresh',
+    api_unavailable:  'API unavailable',
+    expired:          'expired',
+    reset_in:         'reset in',
+    limit_in:         '⚠ limit in ~',
+    eta_short:        '⚠ ~',
+    min:              'min',
+    all_tab:          'All',
+    cache_label:      'Cache · ',
+    today_compact:    'Today',
+    day_suffix:       'd',
+    tooltip_messages: 'Number of API calls',
+    tooltip_input:    'Tokens sent to Claude',
+    tooltip_output:   'Tokens generated by Claude',
+    tooltip_cost:     'Estimate based on public pricing',
+    tooltip_cache:    'Cache read = 10× cheaper · Cache write ≈ input rate',
+  }
+};
+
+let _lang = 'fr';
+let T = STRINGS.fr;
+
+function applyLang(lang) {
+  _lang = lang;
+  T = STRINGS[lang] || STRINGS.fr;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = T[el.dataset.i18n] || el.textContent;
+  });
+  document.querySelectorAll('[data-i18n-tooltip]').forEach(el => {
+    const key = el.dataset.i18nTooltip;
+    if (T[key]) el.dataset.tooltip = T[key];
+  });
+  const quitBtn = document.getElementById('btn-quit');
+  if (quitBtn) quitBtn.textContent = T.quit;
+  const refreshText = document.getElementById('refresh-text');
+  if (refreshText) refreshText.textContent = T.refresh;
+  const compactBtn = document.getElementById('compact-btn');
+  if (compactBtn) compactBtn.textContent = _isCompact ? T.detail : T.compact;
+}
+
 function fmtTokens(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
   if (n >= 1e3) return Math.round(n / 1e3) + 'K';
@@ -498,21 +586,22 @@ function fmtCost(usd) {
 }
 
 function fmtNum(n) {
-  return n.toLocaleString('fr-FR');
+  return n.toLocaleString(_lang === 'fr' ? 'fr-FR' : 'en-US');
 }
 
 function fmtReset(isoStr) {
   if (!isoStr) return '';
   try {
     const diff = new Date(isoStr) - new Date();
-    if (diff <= 0) return 'expiré';
+    if (diff <= 0) return T.expired;
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
+    const mStr = String(m).padStart(2, '0');
     if (h >= 24) {
       const d = Math.floor(h / 24);
-      return `reset dans ${d}j ${h % 24}h${String(m).padStart(2, '0')}`;
+      return `${T.reset_in} ${d}${T.day_suffix} ${h % 24}h${mStr}`;
     }
-    return `reset dans ${h}h${String(m).padStart(2, '0')}`;
+    return `${T.reset_in} ${h}h${mStr}`;
   } catch (e) { return ''; }
 }
 
@@ -548,7 +637,7 @@ const DETAIL_H  = 620;
 function applyCompact(compact) {
   _isCompact = compact;
   document.body.classList.toggle('is-compact', compact);
-  document.getElementById('compact-btn').textContent = compact ? 'Détail' : 'Compact';
+  document.getElementById('compact-btn').textContent = compact ? T.detail : T.compact;
   window.webkit.messageHandlers.action.postMessage({
     type: 'resize',
     height: compact ? COMPACT_H : DETAIL_H
@@ -571,7 +660,7 @@ function updateCompactView(data) {
   if (data.eta_min != null) {
     const h = Math.floor(data.eta_min / 60);
     const m = data.eta_min % 60;
-    etaEl.textContent = '⚠ ~' + (h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' min');
+    etaEl.textContent = T.eta_short + (h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' ' + T.min);
   } else {
     etaEl.textContent = '';
   }
@@ -584,7 +673,7 @@ function showTodayStats(src) {
   set('today-output', fmtTokens(src.output || 0));
   set('today-cost',   fmtCost(src.cost     || 0));
   const cache = (src.cache_read || 0) + (src.cache_create || 0);
-  set('today-cache', cache > 0 ? 'Cache · ' + fmtTokens(cache) : '');
+  set('today-cache', cache > 0 ? T.cache_label + fmtTokens(cache) : '');
 }
 
 function buildModelUI(t) {
@@ -601,7 +690,7 @@ function buildModelUI(t) {
     return;
   }
 
-  tabBar.innerHTML = '<button class="tab' + (_activeTab === 'all' ? ' active' : '') + '" data-model="all">Tous</button>' +
+  tabBar.innerHTML = '<button class="tab' + (_activeTab === 'all' ? ' active' : '') + '" data-model="all">' + T.all_tab + '</button>' +
     sorted.map(([m]) => '<button class="tab' + (_activeTab === m ? ' active' : '') + '" data-model="' + m + '">' + m.split(' ')[0] + '</button>').join('');
 
   tabBar.querySelectorAll('.tab').forEach(btn => {
@@ -633,7 +722,9 @@ function buildModelUI(t) {
 window.updateData = function(data) {
   _lastData = data;
   const now = new Date();
-  set('updated', 'Mis à jour · ' +
+  if (data.lang) applyLang(data.lang);
+
+  set('updated', T.updated +
     String(now.getHours()).padStart(2,'0') + ':' +
     String(now.getMinutes()).padStart(2,'0'));
 
@@ -646,8 +737,8 @@ window.updateData = function(data) {
     set('reset-7d', fmtReset(sd.resets_at));
     document.getElementById('live-content').style.opacity = '1';
   } else {
-    set('pct-5h', '—'); set('reset-5h', 'API indisponible');
-    set('pct-7d', '—'); set('reset-7d', 'API indisponible');
+    set('pct-5h', '—'); set('reset-5h', T.api_unavailable);
+    set('pct-7d', '—'); set('reset-7d', T.api_unavailable);
     document.getElementById('live-content').style.opacity = '0.5';
   }
 
@@ -655,7 +746,7 @@ window.updateData = function(data) {
   if (data.eta_min != null) {
     const h = Math.floor(data.eta_min / 60);
     const m = data.eta_min % 60;
-    etaEl.textContent = '⚠ limite dans ~' + (h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' min');
+    etaEl.textContent = T.limit_in + (h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' ' + T.min);
   } else {
     etaEl.textContent = '';
   }
