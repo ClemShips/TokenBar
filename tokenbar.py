@@ -31,7 +31,7 @@ log = logging.getLogger("tokenbar")
 log.addFilter(TokenRedactFilter())
 
 import objc
-from Foundation import NSObject, NSURL, NSTimer, NSLocale
+from Foundation import NSObject, NSURL, NSTimer, NSLocale, NSBundle
 from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength,
     NSPopover, NSPopoverBehaviorTransient,
@@ -186,15 +186,20 @@ MENU_STRINGS = {
         "copy_stats":  "Copier les stats",
         "dashboard":   "Dashboard Anthropic",
         "preferences": "Préférences...",
+        "about":       "À propos...",
         "quit":        "Quitter",
     },
     "en": {
         "copy_stats":  "Copy stats",
         "dashboard":   "Anthropic Dashboard",
         "preferences": "Preferences...",
+        "about":       "About...",
         "quit":        "Quit",
     },
 }
+
+APP_VERSION = "1.0.0"
+GITHUB_URL  = "https://github.com/ClemShips/TokenBar"
 
 
 def detect_lang():
@@ -625,6 +630,13 @@ class ActionHandler(NSObject):
         elif action_type == "refresh":
             if self.delegate:
                 self.delegate.start_refresh()
+        elif action_type == "open_url":
+            try:
+                url = body["url"] if hasattr(body, "__getitem__") else ""
+                if url:
+                    subprocess.Popen(["open", str(url)])
+            except Exception:
+                pass
         elif action_type == "resize":
             try:
                 h = int(body["height"]) if hasattr(body, "__getitem__") else 620
@@ -678,7 +690,7 @@ class AppDelegate(NSObject):
         self._handler = handler
 
         self._webview = WKWebView.alloc().initWithFrame_configuration_(
-            NSMakeRect(0, 0, 340, 620), config
+            NSMakeRect(0, 0, 340, 590), config
         )
         self._webview.setAutoresizingMask_(18)
 
@@ -694,7 +706,7 @@ class AppDelegate(NSObject):
 
     def _setup_popover(self):
         self._popover = NSPopover.alloc().init()
-        self._popover.setContentSize_(NSMakeSize(340, 620))
+        self._popover.setContentSize_(NSMakeSize(340, 590))
         self._popover.setBehavior_(NSPopoverBehaviorTransient)
 
         vc = NSViewController.alloc().init()
@@ -732,6 +744,13 @@ class AppDelegate(NSObject):
 
         menu.addItem_(NSMenuItem.separatorItem())
 
+        about_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            s["about"], objc.selector(self.showAbout_, signature=b'v@:@'), "")
+        about_item.setTarget_(self)
+        menu.addItem_(about_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
         quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
             s["quit"], objc.selector(self.quitApp_, signature=b'v@:@'), "q")
         quit_item.setTarget_(self)
@@ -762,6 +781,27 @@ class AppDelegate(NSObject):
         pb = NSPasteboard.generalPasteboard()
         pb.clearContents()
         pb.setString_forType_(text, NSPasteboardTypeString)
+
+    def showAbout_(self, sender):
+        try:
+            info = NSBundle.mainBundle().infoDictionary()
+            version = str(info.get("CFBundleShortVersionString") or APP_VERSION)
+        except Exception:
+            version = APP_VERSION
+        token = get_oauth_token()
+        about = {
+            "version": version,
+            "oauth_ok": token is not None,
+            "github_url": GITHUB_URL,
+            "lang": self._lang,
+        }
+        if not self._popover.isShown():
+            btn = self._status_item.button()
+            self._popover.showRelativeToRect_ofView_preferredEdge_(
+                btn.bounds(), btn, NSRectEdgeMinY
+            )
+        js = f"if(window.showAbout) window.showAbout({json.dumps(about)})"
+        self._webview.evaluateJavaScript_completionHandler_(js, None)
 
     def openDashboard_(self, sender):
         subprocess.Popen(["open", "https://claude.ai"])

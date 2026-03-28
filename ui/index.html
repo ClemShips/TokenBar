@@ -301,6 +301,25 @@ body {
   padding: 4px 0;
 }
 
+/* About overlay */
+.about-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  z-index: 200;
+  flex-direction: column;
+  padding: 24px 20px 20px;
+  gap: 16px;
+}
+.about-overlay.visible { display: flex; }
+.about-title   { font-size: 18px; font-weight: 700; color: var(--text); }
+.about-version { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.about-row     { font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.about-link    { font-size: 12px; color: var(--green); cursor: pointer; text-decoration: none; }
+.about-link:hover { opacity: 0.7; }
+.about-footer  { display: flex; justify-content: flex-end; margin-top: 8px; }
+
 /* Compact / Detailed toggle */
 .view-compact  { display: none; }
 .is-compact .view-compact  { display: block; }
@@ -352,7 +371,21 @@ body {
 }
 </style>
 </head>
-<body>
+<body style="position:relative">
+
+<div class="about-overlay" id="about-overlay">
+  <div>
+    <div class="about-title">TokenBar</div>
+    <div class="about-version" id="about-version"></div>
+  </div>
+  <div class="about-row" id="about-oauth"></div>
+  <div>
+    <a class="about-link" id="about-github-link" onclick="doOpenUrl()">GitHub →</a>
+  </div>
+  <div class="about-footer">
+    <button class="btn btn-refresh" onclick="hideAbout()" id="about-close-btn">Fermer</button>
+  </div>
+</div>
 
 <div class="header">
   <div class="header-left">
@@ -632,7 +665,8 @@ let _activeTab  = 'all';
 let _isCompact  = false;
 
 const COMPACT_H = 252;
-const DETAIL_H  = 620;
+const DETAIL_H  = 590;
+const ABOUT_H   = 210;
 
 function applyCompact(compact) {
   _isCompact = compact;
@@ -786,6 +820,27 @@ function doQuit() {
 }
 function doRefresh() {
   window.webkit.messageHandlers.action.postMessage({ type: 'refresh' });
+}
+
+let _aboutGithubUrl = '';
+window.showAbout = function(data) {
+  const lang = data.lang || _lang;
+  const isFr = lang === 'fr';
+  document.getElementById('about-version').textContent = 'v' + data.version;
+  document.getElementById('about-oauth').textContent =
+    (isFr ? 'OAuth : ' : 'OAuth: ') + (data.oauth_ok ? 'Connecté ✓' : 'Token expiré ✗');
+  _aboutGithubUrl = data.github_url || '';
+  document.getElementById('about-close-btn').textContent = isFr ? 'Fermer' : 'Close';
+  document.getElementById('about-overlay').classList.add('visible');
+  window.webkit.messageHandlers.action.postMessage({ type: 'resize', height: ABOUT_H });
+};
+function hideAbout() {
+  document.getElementById('about-overlay').classList.remove('visible');
+  const h = _isCompact ? COMPACT_H : DETAIL_H;
+  window.webkit.messageHandlers.action.postMessage({ type: 'resize', height: h });
+}
+function doOpenUrl() {
+  window.webkit.messageHandlers.action.postMessage({ type: 'open_url', url: _aboutGithubUrl });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
