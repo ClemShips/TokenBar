@@ -37,6 +37,8 @@ from AppKit import (
     NSPopover, NSPopoverBehaviorTransient,
     NSViewController, NSMakeSize, NSMakeRect, NSRectEdgeMinY,
     NSSound,
+    NSMenu, NSMenuItem,
+    NSPasteboard, NSPasteboardTypeString,
 )
 from WebKit import WKWebView, WKWebViewConfiguration
 
@@ -638,8 +640,9 @@ class AppDelegate(NSObject):
         self._status_item = bar.statusItemWithLength_(NSVariableStatusItemLength)
         btn = self._status_item.button()
         btn.setTitle_("◆ …")
-        btn.setAction_(objc.selector(self.togglePopover_, signature=b'v@:@'))
+        btn.setAction_(objc.selector(self.statusItemClicked_, signature=b'v@:@'))
         btn.setTarget_(self)
+        btn.sendActionOn_(4 | 8)  # NSEventMaskLeftMouseUp | NSEventMaskRightMouseDown
 
     def _setup_webview(self):
         config = WKWebViewConfiguration.alloc().init()
@@ -672,6 +675,80 @@ class AppDelegate(NSObject):
         vc = NSViewController.alloc().init()
         vc.setView_(self._webview)
         self._popover.setContentViewController_(vc)
+
+    def statusItemClicked_(self, sender):
+        event = NSApplication.sharedApplication().currentEvent()
+        if event and event.type() == 3:  # NSEventTypeRightMouseDown
+            self._show_context_menu()
+        else:
+            self.togglePopover_(sender)
+
+    def _show_context_menu(self):
+        menu = NSMenu.alloc().init()
+
+        copy_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Copier les stats", objc.selector(self.copyStats_, signature=b'v@:@'), "")
+        copy_item.setTarget_(self)
+        copy_item.setEnabled_(self._cached_data is not None)
+        menu.addItem_(copy_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
+        dash_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Dashboard Anthropic", objc.selector(self.openDashboard_, signature=b'v@:@'), "")
+        dash_item.setTarget_(self)
+        menu.addItem_(dash_item)
+
+        prefs_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Préférences...", objc.selector(self.openPreferences_, signature=b'v@:@'), "")
+        prefs_item.setTarget_(self)
+        menu.addItem_(prefs_item)
+
+        menu.addItem_(NSMenuItem.separatorItem())
+
+        quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Quitter", objc.selector(self.quitApp_, signature=b'v@:@'), "q")
+        quit_item.setTarget_(self)
+        menu.addItem_(quit_item)
+
+        self._status_item.popUpStatusItemMenu_(menu)
+
+    def copyStats_(self, sender):
+        data = self._cached_data
+        if not data:
+            return
+        today = data.get("today", {})
+        fh = (data.get("live") or {}).get("five_hour", {})
+        pct = fh.get("utilization")
+        out = today.get("output", 0)
+        cost = today.get("cost", 0)
+        out_str = f"{out/1e6:.1f}M" if out >= 1e6 else f"{round(out/1e3)}K" if out >= 1e3 else str(out)
+        cost_str = f"${cost:.2f}" if cost >= 1 else f"${cost:.3f}"
+        pct_str = f"{round(pct)}%" if pct is not None else "N/A"
+        by_model = today.get("by_model", {})
+        if by_model:
+            top = max(by_model.items(), key=lambda x: x[1].get("output", 0))
+            total = today.get("output", 1) or 1
+            model_str = f"{top[0]} ({round(top[1].get('output',0)/total*100)}%)"
+        else:
+            model_str = "N/A"
+        text = f"🔷 TokenBar — Today: {out_str} output, {cost_str} | 5h window: {pct_str} | Top model: {model_str}"
+        pb = NSPasteboard.generalPasteboard()
+        pb.clearContents()
+        pb.setString_forType_(text, NSPasteboardTypeString)
+
+    def openDashboard_(self, sender):
+        subprocess.Popen(["open", "https://claude.ai"])
+
+    def openPreferences_(self, sender):
+        if not os.path.exists(CONFIG_FILE):
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_CONFIG, f, indent=2, ensure_ascii=False)
+        subprocess.Popen(["open", CONFIG_FILE])
+
+    def quitApp_(self, sender):
+        NSApplication.sharedApplication().terminate_(None)
 
     def resizePopover_(self, height):
         self._popover.setContentSize_(NSMakeSize(340, float(height)))
