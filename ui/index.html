@@ -320,6 +320,25 @@ body {
 .about-link:hover { opacity: 0.7; }
 .about-footer  { display: flex; justify-content: flex-end; margin-top: 8px; }
 
+/* Update banner */
+.update-banner {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  height: 34px;
+  background: var(--badge-green-bg);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+.update-banner-text { font-size: 12px; color: var(--badge-green); font-weight: 500; }
+.update-banner-btn {
+  font-size: 11px; font-weight: 600; color: var(--badge-green);
+  background: var(--badge-green-bg); border: none; border-radius: 4px;
+  padding: 3px 8px; cursor: pointer; white-space: nowrap;
+}
+.update-banner-btn:hover { opacity: 0.75; }
+
 /* Compact / Detailed toggle */
 .view-compact  { display: none; }
 .is-compact .view-compact  { display: block; }
@@ -384,6 +403,38 @@ body {
   </div>
   <div class="about-footer">
     <button class="btn btn-refresh" onclick="hideAbout()" id="about-close-btn">Fermer</button>
+  </div>
+</div>
+
+<div class="update-banner" id="update-banner">
+  <span class="update-banner-text" id="update-text"></span>
+  <button class="update-banner-btn" id="update-banner-btn" onclick="onUpdateClick()">Mettre à jour</button>
+</div>
+
+<div class="about-overlay" id="update-overlay">
+  <div id="update-step-confirm" style="display:flex;flex-direction:column;gap:12px;width:100%">
+    <div class="about-title" id="update-overlay-title"></div>
+    <div class="about-version" id="update-overlay-version"></div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:4px">
+      <span id="update-overlay-desc"></span><br>
+      <code style="display:inline-block;margin-top:6px;padding:4px 8px;background:var(--track);border-radius:4px;font-size:11px;color:var(--text)">brew upgrade --cask tokenbar</code>
+    </div>
+    <div class="about-footer" style="gap:8px">
+      <button class="btn" onclick="hideUpdateOverlay()" id="update-cancel-btn" style="background:var(--track);color:var(--text)">Annuler</button>
+      <button class="btn btn-refresh" onclick="confirmUpdate()" id="update-confirm-btn">Confirmer</button>
+    </div>
+  </div>
+  <div id="update-step-running" style="display:none;flex-direction:column;gap:12px;align-items:center">
+    <div class="about-title" id="update-running-title"></div>
+    <div style="font-size:12px;color:var(--muted)" id="update-running-msg"></div>
+  </div>
+  <div id="update-step-done" style="display:none;flex-direction:column;gap:12px">
+    <div class="about-title" id="update-done-title"></div>
+    <div style="font-size:12px;color:var(--muted)" id="update-done-msg"></div>
+    <div class="about-footer" style="gap:8px">
+      <button class="btn btn-refresh" id="update-restart-btn" onclick="restartApp()" style="display:none"></button>
+      <button class="btn" onclick="hideUpdateOverlay()" id="update-close-btn" style="background:var(--track);color:var(--text)">Fermer</button>
+    </div>
   </div>
 </div>
 
@@ -664,9 +715,20 @@ let _lastData   = null;
 let _activeTab  = 'all';
 let _isCompact  = false;
 
-const COMPACT_H = 252;
-const DETAIL_H  = 590;
-const ABOUT_H   = 210;
+const BASE_COMPACT_H = 252;
+const BASE_DETAIL_H  = 590;
+const ABOUT_H        = 210;
+const BANNER_H       = 34;
+
+let _updateBannerVisible = false;
+let _updateBannerUrl     = '';
+
+function currentHeight() {
+  return (_isCompact ? BASE_COMPACT_H : BASE_DETAIL_H) + (_updateBannerVisible ? BANNER_H : 0);
+}
+
+const COMPACT_H = BASE_COMPACT_H;
+const DETAIL_H  = BASE_DETAIL_H;
 
 function applyCompact(compact) {
   _isCompact = compact;
@@ -674,7 +736,7 @@ function applyCompact(compact) {
   document.getElementById('compact-btn').textContent = compact ? T.detail : T.compact;
   window.webkit.messageHandlers.action.postMessage({
     type: 'resize',
-    height: compact ? COMPACT_H : DETAIL_H
+    height: currentHeight()
   });
 }
 
@@ -813,7 +875,106 @@ window.updateData = function(data) {
   set('hist-cost',   fmtCost(h.cost   || 0));
 
   if (_isCompact) updateCompactView(data);
+
+  if (data.update_available) {
+    showUpdateBanner(data.update_available.version, data.update_available.url, !!data.update_auto_approved);
+  }
 };
+
+let _updateVersion   = '';
+let _updateAutoApproved = false;
+const UPDATE_OVERLAY_H = 240;
+
+function showUpdateBanner(version, url, autoApproved) {
+  _updateVersion      = version;
+  _updateBannerUrl    = url;
+  _updateAutoApproved = autoApproved;
+  const isFr = _lang === 'fr';
+  document.getElementById('update-text').textContent =
+    isFr ? `Mise à jour disponible : v${version}` : `Update available: v${version}`;
+  document.getElementById('update-banner-btn').textContent =
+    isFr ? 'Mettre à jour' : 'Update';
+  if (!_updateBannerVisible) {
+    _updateBannerVisible = true;
+    document.getElementById('update-banner').style.display = 'flex';
+    window.webkit.messageHandlers.action.postMessage({ type: 'resize', height: currentHeight() });
+  }
+}
+
+function onUpdateClick() {
+  if (_updateAutoApproved) {
+    _showUpdateStep('running');
+    window.webkit.messageHandlers.action.postMessage({ type: 'run_update' });
+  } else {
+    _showUpdateOverlay();
+  }
+}
+
+function _showUpdateOverlay() {
+  const isFr = _lang === 'fr';
+  document.getElementById('update-overlay-title').textContent =
+    isFr ? 'Mettre à jour TokenBar' : 'Update TokenBar';
+  document.getElementById('update-overlay-version').textContent =
+    `v${_updateVersion}`;
+  document.getElementById('update-overlay-desc').textContent =
+    isFr ? 'TokenBar va lancer la commande suivante :' : 'TokenBar will run the following command:';
+  document.getElementById('update-cancel-btn').textContent  = isFr ? 'Annuler' : 'Cancel';
+  document.getElementById('update-confirm-btn').textContent = isFr ? 'Confirmer' : 'Confirm';
+  _showUpdateStep('confirm');
+  document.getElementById('update-overlay').classList.add('visible');
+  window.webkit.messageHandlers.action.postMessage({ type: 'resize', height: UPDATE_OVERLAY_H });
+}
+
+function hideUpdateOverlay() {
+  document.getElementById('update-overlay').classList.remove('visible');
+  window.webkit.messageHandlers.action.postMessage({ type: 'resize', height: currentHeight() });
+}
+
+function confirmUpdate() {
+  _showUpdateStep('running');
+  window.webkit.messageHandlers.action.postMessage({ type: 'run_update' });
+}
+
+function _showUpdateStep(step) {
+  const isFr = _lang === 'fr';
+  document.getElementById('update-step-confirm').style.display  = step === 'confirm'  ? 'flex'   : 'none';
+  document.getElementById('update-step-running').style.display  = step === 'running'  ? 'flex'   : 'none';
+  document.getElementById('update-step-done').style.display     = step === 'done'     ? 'flex'   : 'none';
+  if (step === 'running') {
+    document.getElementById('update-running-title').textContent =
+      isFr ? 'Mise à jour...' : 'Updating...';
+    document.getElementById('update-running-msg').textContent =
+      isFr ? 'brew upgrade --cask tokenbar' : 'brew upgrade --cask tokenbar';
+    if (!document.getElementById('update-overlay').classList.contains('visible')) {
+      document.getElementById('update-overlay').classList.add('visible');
+      window.webkit.messageHandlers.action.postMessage({ type: 'resize', height: UPDATE_OVERLAY_H });
+    }
+  }
+}
+
+window.updateDone = function(success, error) {
+  const isFr = _lang === 'fr';
+  _updateAutoApproved = success ? true : _updateAutoApproved;
+  _showUpdateStep('done');
+  const restartBtn = document.getElementById('update-restart-btn');
+  if (success) {
+    _updateBannerVisible = false;
+    document.getElementById('update-banner').style.display = 'none';
+    document.getElementById('update-done-title').textContent = isFr ? 'Mise à jour installée !' : 'Update installed!';
+    document.getElementById('update-done-msg').textContent   = isFr ? 'Relancez TokenBar pour appliquer la mise à jour.' : 'Restart TokenBar to apply the update.';
+    restartBtn.textContent = isFr ? 'Relancer' : 'Restart';
+    restartBtn.style.display = 'block';
+  } else {
+    document.getElementById('update-done-title').textContent = isFr ? 'Erreur' : 'Error';
+    document.getElementById('update-done-msg').textContent   = error || (isFr ? 'Une erreur est survenue.' : 'An error occurred.');
+    restartBtn.style.display = 'none';
+  }
+  document.getElementById('update-close-btn').textContent = isFr ? 'Fermer' : 'Close';
+};
+
+function restartApp() {
+  window.webkit.messageHandlers.action.postMessage({ type: 'restart_app' });
+}
 
 function doQuit() {
   window.webkit.messageHandlers.action.postMessage({ type: 'quit' });
@@ -836,8 +997,7 @@ window.showAbout = function(data) {
 };
 function hideAbout() {
   document.getElementById('about-overlay').classList.remove('visible');
-  const h = _isCompact ? COMPACT_H : DETAIL_H;
-  window.webkit.messageHandlers.action.postMessage({ type: 'resize', height: h });
+  window.webkit.messageHandlers.action.postMessage({ type: 'resize', height: currentHeight() });
 }
 function doOpenUrl() {
   window.webkit.messageHandlers.action.postMessage({ type: 'open_url', url: _aboutGithubUrl });

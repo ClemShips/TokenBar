@@ -7,6 +7,7 @@ import sys
 import glob
 import subprocess
 import threading
+import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import re
@@ -198,8 +199,55 @@ MENU_STRINGS = {
     },
 }
 
-APP_VERSION = "1.0.0"
-GITHUB_URL  = "https://github.com/ClemShips/TokenBar"
+APP_VERSION          = "1.0.0"
+GITHUB_URL           = "https://github.com/ClemShips/TokenBar"
+GITHUB_API_LATEST    = "https://api.github.com/repos/ClemShips/TokenBar/releases/latest"
+UPDATE_CHECK_HOURS   = 24
+
+
+def _version_tuple(v):
+    try:
+        return tuple(int(x) for x in v.lstrip("v").split("."))
+    except Exception:
+        return (0,)
+
+
+def check_for_update(cache):
+    now = datetime.now(timezone.utc)
+    last_str = cache.get("last_update_check")
+    if last_str:
+        try:
+            last = datetime.fromisoformat(last_str)
+            if (now - last).total_seconds() < UPDATE_CHECK_HOURS * 3600:
+                latest = cache.get("latest_version")
+                if latest and _version_tuple(latest) > _version_tuple(APP_VERSION):
+                    if cache.get("update_installed_version") == latest:
+                        return None
+                    return {"version": latest, "url": cache.get("latest_url", GITHUB_URL + "/releases")}
+                return None
+        except Exception:
+            pass
+    try:
+        req = urllib.request.Request(
+            GITHUB_API_LATEST,
+            headers={"User-Agent": f"TokenBar/{APP_VERSION}", "Accept": "application/vnd.github+json"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            payload = json.loads(resp.read())
+        tag = payload.get("tag_name", "")
+        url = payload.get("html_url", GITHUB_URL + "/releases")
+        latest = tag.lstrip("v")
+        cache["last_update_check"] = now.isoformat()
+        cache["latest_version"] = latest
+        cache["latest_url"] = url
+        if _version_tuple(latest) > _version_tuple(APP_VERSION):
+            if cache.get("update_installed_version") == latest:
+                return None
+            return {"version": latest, "url": url}
+        return None
+    except Exception as e:
+        log.debug("Update check failed: %s", e)
+        return None
 
 
 def detect_lang():
@@ -645,6 +693,12 @@ class ActionHandler(NSObject):
                 h = 620
             if self.delegate:
                 self.delegate.resizePopover_(h)
+        elif action_type == "run_update":
+            if self.delegate:
+                threading.Thread(target=self.delegate._do_brew_update, daemon=True).start()
+        elif action_type == "restart_app":
+            subprocess.Popen(["open", "/Applications/TokenBar.app"])
+            NSApplication.sharedApplication().terminate_(None)
 
 
 class AppDelegate(NSObject):
@@ -851,17 +905,20 @@ class AppDelegate(NSObject):
         update_yesterday_summary(cache, local["today"])
         day_delta = compute_day_comparison(cache, local["today"])
         check_thresholds(cache, fh_pct_val, config)
+        update_info = check_for_update(cache)
 
         data = {
-            "live":    live,
-            "today":   local["today"],
-            "7d":      local["7d"],
-            "month":   local["month"],
-            "history": history,
-            "config":  {"currency": config["currency"]},
-            "lang":    self._lang,
-            "eta_min": eta_min,
-            "day_delta": day_delta,
+            "live":           live,
+            "today":          local["today"],
+            "7d":             local["7d"],
+            "month":          local["month"],
+            "history":        history,
+            "config":         {"currency": config["currency"]},
+            "lang":           self._lang,
+            "eta_min":        eta_min,
+            "day_delta":      day_delta,
+            "update_available":    update_info,
+            "update_auto_approved": cache.get("update_auto_approved", False),
         }
         self._cached_data = data
         save_cache(cache)
@@ -899,6 +956,44 @@ class AppDelegate(NSObject):
     def _push_data_to_webview(self, data):
         js = f"if(window.updateData) window.updateData({json.dumps(data)})"
         self._webview.evaluateJavaScript_completionHandler_(js, None)
+
+    def evalJS_(self, js_str):
+        self._webview.evaluateJavaScript_completionHandler_(js_str, None)
+
+    def _run_js_main(self, js):
+        self.performSelectorOnMainThread_withObject_waitUntilDone_(
+            objc.selector(self.evalJS_, signature=b'v@:@'), js, False
+        )
+
+    def _do_brew_update(self):
+        brew = shutil.which("brew")
+        if not brew:
+            self._run_js_main("if(window.updateDone) window.updateDone(false, 'Homebrew n\\'est pas installé')")
+            return
+        try:
+            subprocess.run([brew, "tap", "clemships/tokenbar"], capture_output=True, timeout=30)
+            result = subprocess.run(
+                [brew, "upgrade", "--cask", "tokenbar"],
+                capture_output=True, text=True, timeout=120
+            )
+            if result.returncode != 0:
+                result = subprocess.run(
+                    [brew, "install", "--cask", "--force", "tokenbar"],
+                    capture_output=True, text=True, timeout=120
+                )
+            if result.returncode == 0:
+                cache = load_cache()
+                cache["update_auto_approved"] = True
+                cache["update_installed_version"] = cache.get("latest_version", "")
+                save_cache(cache)
+                self._run_js_main("if(window.updateDone) window.updateDone(true, null)")
+            else:
+                err = (result.stderr or result.stdout or "Erreur inconnue").strip()
+                self._run_js_main(f"if(window.updateDone) window.updateDone(false, {json.dumps(err)})")
+        except subprocess.TimeoutExpired:
+            self._run_js_main("if(window.updateDone) window.updateDone(false, 'Timeout — réessayez manuellement')")
+        except Exception as e:
+            self._run_js_main(f"if(window.updateDone) window.updateDone(false, {json.dumps(str(e))})")
 
 
 if __name__ == "__main__":
